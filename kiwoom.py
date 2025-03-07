@@ -77,9 +77,9 @@ class KiwoomUI(QMainWindow):
 
 
     def load_candidates_list(self):
-        """filtered_stocks.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
+        """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
         try:
-            with open("filtered_stocks.json", "r", encoding="utf-8") as file:
+            with open("filtered_candidates.json", "r", encoding="utf-8") as file:
                 data = json.load(file)
                 all_stocks = data.get("stocks", [])
 
@@ -100,7 +100,7 @@ class KiwoomUI(QMainWindow):
 
         except FileNotFoundError:
             self.candidates_stocks = []
-            print("filtered_stocks.json 파일을 찾을 수 없습니다.")
+            print("❌ filtered_candidates.json 파일을 찾을 수 없습니다.")
 
     def update_stock_prices(self):
         """주기적으로 현재가를 가져와서 테이블 업데이트"""
@@ -124,6 +124,7 @@ class KiwoomUI(QMainWindow):
             self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
             self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
             self.candidates_table.setItem(row, 4, QTableWidgetItem(f"{diff_percent:.2f}%"))
+
 
     def get_holdings(self):
         """현재 보유 종목을 가져와서 owned_stocks에 저장"""
