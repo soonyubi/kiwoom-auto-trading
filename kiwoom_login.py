@@ -3,8 +3,9 @@ import json
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
-    QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem
+    QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox
 )
+from PyQt5.QtGui import QFont
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QTimer
 
@@ -21,6 +22,12 @@ class KiwoomUI(QMainWindow):
         self.kiwoom = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
         self.kiwoom.OnEventConnect.connect(self.on_event_connect)
         self.kiwoom.OnReceiveTrData.connect(self.on_receive_tr_data)  # TR 데이터 수신 이벤트 연결
+
+        # 데이터 로드
+        self.candidates_stocks = self.load_candidate_stocks()
+        self.owned_stocks = set()  # 보유 종목 리스트
+        self.filtered_stocks = []
+
 
         # 탭 위젯 추가
         self.tabs = QTabWidget(self)
@@ -45,13 +52,8 @@ class KiwoomUI(QMainWindow):
         # UI 설정
         self.setup_login_ui()
         self.setup_account_ui()
-        self.setup_search_ui()
         self.setup_candidates_tab_ui()  # 새롭게 추가한 후보군 리스트 UI
         
-        # 데이터 로드
-        self.candidates_stocks = self.load_candidate_stocks()
-        self.owned_stocks = set()  # 보유 종목 리스트
-        self.filtered_stocks = []
 
         # 실시간 업데이트 타이머 설정 (2초마다 실행)
         self.timer = QTimer(self)
@@ -72,21 +74,7 @@ class KiwoomUI(QMainWindow):
 
         # 초기 데이터 로드
         self.load_candidates_list()
-        
-    def setup_candidates_tab_ui(self):
-        """후보군 리스트 UI 설정"""
-        layout = QVBoxLayout()
 
-        # 종목 리스트 테이블
-        self.candidates_table = QTableWidget()
-        self.candidates_table.setColumnCount(4)  # 현재가, 20이평, 차이(금액), 차이(%)
-        self.candidates_table.setHorizontalHeaderLabels(["종목코드", "현재가", "20이평", "차이(금액)", "차이(%)"])
-        layout.addWidget(self.candidates_table)
-
-        self.candidates_tab.setLayout(layout)
-
-        # 초기 데이터 로드
-        self.load_candidates_list()
 
     def load_candidates_list(self):
         """filtered_stocks.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
