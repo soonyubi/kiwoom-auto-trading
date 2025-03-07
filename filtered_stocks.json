@@ -1,0 +1,764 @@
+{
+    "stocks": [
+        {
+            "stock_code": "009540.KS",
+            "price": 233500.0
+        },
+        {
+            "stock_code": "010060.KS",
+            "price": 86200.0
+        },
+        {
+            "stock_code": "003490.KS",
+            "price": 24250.0
+        },
+        {
+            "stock_code": "357250.KS",
+            "price": 2700.0
+        },
+        {
+            "stock_code": "107590.KS",
+            "price": 73300.0
+        },
+        {
+            "stock_code": "009770.KS",
+            "price": 26450.0
+        },
+        {
+            "stock_code": "021820.KS",
+            "price": 8140.0
+        },
+        {
+            "stock_code": "088260.KS",
+            "price": 4335.0
+        },
+        {
+            "stock_code": "192820.KS",
+            "price": 184300.0
+        },
+        {
+            "stock_code": "039490.KS",
+            "price": 116100.0
+        },
+        {
+            "stock_code": "084870.KS",
+            "price": 1116.0
+        },
+        {
+            "stock_code": "016800.KS",
+            "price": 43050.0
+        },
+        {
+            "stock_code": "000970.KS",
+            "price": 6330.0
+        },
+        {
+            "stock_code": "003300.KS",
+            "price": 13930.0
+        },
+        {
+            "stock_code": "093240.KS",
+            "price": 2220.0
+        },
+        {
+            "stock_code": "900290.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "044180.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "101000.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "036120.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "057030.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "036620.KS",
+            "price": 3395.0
+        },
+        {
+            "stock_code": "036190.KS",
+            "price": 25550.0
+        },
+        {
+            "stock_code": "308100.KS",
+            "price": 2885.0
+        },
+        {
+            "stock_code": "142280.KS",
+            "price": 3825.0
+        },
+        {
+            "stock_code": "016100.KS",
+            "price": 2590.0
+        },
+        {
+            "stock_code": "006920.KS",
+            "price": 3155.0
+        },
+        {
+            "stock_code": "314930.KS",
+            "price": 14450.0
+        },
+        {
+            "stock_code": "396300.KS",
+            "price": 2350.0
+        },
+        {
+            "stock_code": "060240.KS",
+            "price": 5400.0
+        },
+        {
+            "stock_code": "096530.KS",
+            "price": 24950.0
+        },
+        {
+            "stock_code": "453860.KS",
+            "price": 19760.0
+        },
+        {
+            "stock_code": "072990.KS",
+            "price": 9250.0
+        },
+        {
+            "stock_code": "290650.KS",
+            "price": 23000.0
+        },
+        {
+            "stock_code": "012620.KS",
+            "price": 7160.0
+        },
+        {
+            "stock_code": "069330.KS",
+            "price": 1359.0
+        },
+        {
+            "stock_code": "054210.KS",
+            "price": 4990.0
+        },
+        {
+            "stock_code": "064800.KS",
+            "price": 1226.0
+        },
+        {
+            "stock_code": "417180.KS",
+            "price": 2300.0
+        },
+        {
+            "stock_code": "260870.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "317860.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "199290.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "341310.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "097950.KS",
+            "price": 262000.0
+        },
+        {
+            "stock_code": "097230.KS",
+            "price": 8800.0
+        },
+        {
+            "stock_code": "002710.KS",
+            "price": 28550.0
+        },
+        {
+            "stock_code": "035250.KS",
+            "price": 16150.0
+        },
+        {
+            "stock_code": "000050.KS",
+            "price": 6490.0
+        },
+        {
+            "stock_code": "030210.KS",
+            "price": 3030.0
+        },
+        {
+            "stock_code": "000430.KS",
+            "price": 3815.0
+        },
+        {
+            "stock_code": "005960.KS",
+            "price": 3520.0
+        },
+        {
+            "stock_code": "001080.KS",
+            "price": 26000.0
+        },
+        {
+            "stock_code": "094800.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "026940.KS",
+            "price": 2555.0
+        },
+        {
+            "stock_code": "068270.KS",
+            "price": 184000.0
+        },
+        {
+            "stock_code": "010040.KS",
+            "price": 2200.0
+        },
+        {
+            "stock_code": "161390.KS",
+            "price": 38400.0
+        },
+        {
+            "stock_code": "111110.KS",
+            "price": 7700.0
+        },
+        {
+            "stock_code": "040300.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "048470.KS",
+            "price": 3735.0
+        },
+        {
+            "stock_code": "003310.KS",
+            "price": 1744.0
+        },
+        {
+            "stock_code": "086820.KS",
+            "price": 30050.0
+        },
+        {
+            "stock_code": "053060.KS",
+            "price": 1034.0
+        },
+        {
+            "stock_code": "208640.KS",
+            "price": 291.0
+        },
+        {
+            "stock_code": "095910.KS",
+            "price": 1392.0
+        },
+        {
+            "stock_code": "173940.KS",
+            "price": 3185.0
+        },
+        {
+            "stock_code": "101400.KS",
+            "price": 487.0
+        },
+        {
+            "stock_code": "103840.KS",
+            "price": 3090.0
+        },
+        {
+            "stock_code": "053580.KS",
+            "price": 10270.0
+        },
+        {
+            "stock_code": "136540.KS",
+            "price": 11090.0
+        },
+        {
+            "stock_code": "221800.KS",
+            "price": 3265.0
+        },
+        {
+            "stock_code": "377330.KS",
+            "price": 4830.0
+        },
+        {
+            "stock_code": "033340.KS",
+            "price": 685.0
+        },
+        {
+            "stock_code": "016600.KS",
+            "price": 282.0
+        },
+        {
+            "stock_code": "106240.KS",
+            "price": 1535.0
+        },
+        {
+            "stock_code": "320000.KS",
+            "price": 2620.0
+        },
+        {
+            "stock_code": "092590.KS",
+            "price": 1104.0
+        },
+        {
+            "stock_code": "009160.KS",
+            "price": 3815.0
+        },
+        {
+            "stock_code": "024900.KS",
+            "price": 2790.0
+        },
+        {
+            "stock_code": "008970.KS",
+            "price": 1006.0
+        },
+        {
+            "stock_code": "011230.KS",
+            "price": 3340.0
+        },
+        {
+            "stock_code": "017390.KS",
+            "price": 49850.0
+        },
+        {
+            "stock_code": "003060.KS",
+            "price": 759.0
+        },
+        {
+            "stock_code": "000950.KS",
+            "price": 19250.0
+        },
+        {
+            "stock_code": "011280.KS",
+            "price": 2105.0
+        },
+        {
+            "stock_code": "109960.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "058400.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "039240.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "060380.KS",
+            "price": 1394.0
+        },
+        {
+            "stock_code": "235980.KS",
+            "price": 3635.0
+        },
+        {
+            "stock_code": "012860.KS",
+            "price": 1509.0
+        },
+        {
+            "stock_code": "308080.KS",
+            "price": 2855.0
+        },
+        {
+            "stock_code": "014620.KS",
+            "price": 28850.0
+        },
+        {
+            "stock_code": "101240.KS",
+            "price": 4380.0
+        },
+        {
+            "stock_code": "456010.KS",
+            "price": 12030.0
+        },
+        {
+            "stock_code": "013310.KS",
+            "price": 2735.0
+        },
+        {
+            "stock_code": "355690.KS",
+            "price": 7120.0
+        },
+        {
+            "stock_code": "128540.KS",
+            "price": 1640.0
+        },
+        {
+            "stock_code": "014940.KS",
+            "price": 5620.0
+        },
+        {
+            "stock_code": "403490.KS",
+            "price": 1459.0
+        },
+        {
+            "stock_code": "452400.KS",
+            "price": 9630.0
+        },
+        {
+            "stock_code": "036890.KS",
+            "price": 10590.0
+        },
+        {
+            "stock_code": "033290.KS",
+            "price": 2165.0
+        },
+        {
+            "stock_code": "039340.KS",
+            "price": 6000.0
+        },
+        {
+            "stock_code": "256150.KS",
+            "price": 6400.0
+        },
+        {
+            "stock_code": "266170.KS",
+            "price": 625.0
+        },
+        {
+            "stock_code": "447690.KS",
+            "price": 3430.0
+        },
+        {
+            "stock_code": "234070.KS",
+            "price": 1565.0
+        },
+        {
+            "stock_code": "121060.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "208850.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "336040.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "222670.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "448900.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "448730.KS",
+            "price": 4655.0
+        },
+        {
+            "stock_code": "005850.KS",
+            "price": 32250.0
+        },
+        {
+            "stock_code": "010580.KS",
+            "price": 1220.0
+        },
+        {
+            "stock_code": "000670.KS",
+            "price": 449000.0
+        },
+        {
+            "stock_code": "088790.KS",
+            "price": 1820.0
+        },
+        {
+            "stock_code": "009070.KS",
+            "price": 3930.0
+        },
+        {
+            "stock_code": "024720.KS",
+            "price": 7090.0
+        },
+        {
+            "stock_code": "001420.KS",
+            "price": 3670.0
+        },
+        {
+            "stock_code": "036460.KS",
+            "price": 38300.0
+        },
+        {
+            "stock_code": "012330.KS",
+            "price": 256000.0
+        },
+        {
+            "stock_code": "005870.KS",
+            "price": 9000.0
+        },
+        {
+            "stock_code": "005010.KS",
+            "price": 6200.0
+        },
+        {
+            "stock_code": "000540.KS",
+            "price": 3310.0
+        },
+        {
+            "stock_code": "046440.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "317240.KS",
+            "price": 282.0
+        },
+        {
+            "stock_code": "105740.KS",
+            "price": 9200.0
+        },
+        {
+            "stock_code": "439090.KS",
+            "price": 20150.0
+        },
+        {
+            "stock_code": "019010.KS",
+            "price": 2080.0
+        },
+        {
+            "stock_code": "177350.KS",
+            "price": 1013.0
+        },
+        {
+            "stock_code": "406820.KS",
+            "price": 13850.0
+        },
+        {
+            "stock_code": "458870.KS",
+            "price": 14910.0
+        },
+        {
+            "stock_code": "001540.KS",
+            "price": 6580.0
+        },
+        {
+            "stock_code": "361570.KS",
+            "price": 3040.0
+        },
+        {
+            "stock_code": "123750.KS",
+            "price": 1460.0
+        },
+        {
+            "stock_code": "317870.KS",
+            "price": 16410.0
+        },
+        {
+            "stock_code": "036000.KS",
+            "price": 2725.0
+        },
+        {
+            "stock_code": "008290.KS",
+            "price": 468.0
+        },
+        {
+            "stock_code": "095270.KS",
+            "price": 4710.0
+        },
+        {
+            "stock_code": "048430.KS",
+            "price": 9700.0
+        },
+        {
+            "stock_code": "067920.KS",
+            "price": 5170.0
+        },
+        {
+            "stock_code": "432470.KS",
+            "price": 12520.0
+        },
+        {
+            "stock_code": "040610.KS",
+            "price": 1550.0
+        },
+        {
+            "stock_code": "078140.KS",
+            "price": 13290.0
+        },
+        {
+            "stock_code": "206400.KS",
+            "price": 1824.0
+        },
+        {
+            "stock_code": "162300.KS",
+            "price": 2510.0
+        },
+        {
+            "stock_code": "217330.KS",
+            "price": 4600.0
+        },
+        {
+            "stock_code": "222420.KS",
+            "price": 940.0
+        },
+        {
+            "stock_code": "148930.KS",
+            "price": 3900.0
+        },
+        {
+            "stock_code": "363250.KS",
+            "price": 11030.0
+        },
+        {
+            "stock_code": "042040.KS",
+            "price": 252.0
+        },
+        {
+            "stock_code": "035200.KS",
+            "price": 4265.0
+        },
+        {
+            "stock_code": "047080.KS",
+            "price": 1383.0
+        },
+        {
+            "stock_code": "236030.KS",
+            "price": 998.0
+        },
+        {
+            "stock_code": "279060.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "189350.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "296160.KS",
+            "price": NaN
+        },
+        {
+            "stock_code": "005610.KS",
+            "price": 52200.0
+        },
+        {
+            "stock_code": "465770.KS",
+            "price": 8840.0
+        },
+        {
+            "stock_code": "041650.KS",
+            "price": 2980.0
+        },
+        {
+            "stock_code": "200880.KS",
+            "price": 12860.0
+        },
+        {
+            "stock_code": "004250.KS",
+            "price": 4040.0
+        },
+        {
+            "stock_code": "095720.KS",
+            "price": 1566.0
+        },
+        {
+            "stock_code": "003470.KS",
+            "price": 2710.0
+        },
+        {
+            "stock_code": "008500.KS",
+            "price": 11130.0
+        },
+        {
+            "stock_code": "020760.KS",
+            "price": 867.0
+        },
+        {
+            "stock_code": "120030.KS",
+            "price": 103300.0
+        },
+        {
+            "stock_code": "067830.KS",
+            "price": 2200.0
+        },
+        {
+            "stock_code": "019180.KS",
+            "price": 3125.0
+        },
+        {
+            "stock_code": "083790.KS",
+            "price": 2385.0
+        },
+        {
+            "stock_code": "016250.KS",
+            "price": 14400.0
+        },
+        {
+            "stock_code": "473000.KS",
+            "price": 2060.0
+        },
+        {
+            "stock_code": "455910.KS",
+            "price": 2055.0
+        },
+        {
+            "stock_code": "053950.KS",
+            "price": 664.0
+        },
+        {
+            "stock_code": "026910.KS",
+            "price": 1915.0
+        },
+        {
+            "stock_code": "137080.KS",
+            "price": 3120.0
+        },
+        {
+            "stock_code": "016670.KS",
+            "price": 4120.0
+        },
+        {
+            "stock_code": "451250.KS",
+            "price": 9820.0
+        },
+        {
+            "stock_code": "037460.KS",
+            "price": 10140.0
+        },
+        {
+            "stock_code": "052770.KS",
+            "price": 1524.0
+        },
+        {
+            "stock_code": "291650.KS",
+            "price": 985.0
+        },
+        {
+            "stock_code": "088290.KS",
+            "price": 1063.0
+        },
+        {
+            "stock_code": "211050.KS",
+            "price": 5940.0
+        },
+        {
+            "stock_code": "034940.KS",
+            "price": 1079.0
+        },
+        {
+            "stock_code": "025880.KS",
+            "price": 2730.0
+        },
+        {
+            "stock_code": "034950.KS",
+            "price": 90100.0
+        },
+        {
+            "stock_code": "021650.KS",
+            "price": 2215.0
+        },
+        {
+            "stock_code": "289170.KS",
+            "price": 4985.0
+        },
+        {
+            "stock_code": "413300.KS",
+            "price": 970.0
+        }
+    ]
+}

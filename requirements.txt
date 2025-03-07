@@ -1,0 +1,8 @@
+PyQt5
+numpy
+pandas
+lxml
+requests
+tqdm
+yfinance
+html5lib

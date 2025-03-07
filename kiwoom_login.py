@@ -1,14 +1,16 @@
 import sys
+import json
+import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
-    QWidget, QTabWidget, QMessageBox, QComboBox, QTextEdit
+    QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem
 )
-from PyQt5.QtGui import QFont
 from PyQt5.QAxContainer import QAxWidget
-import numpy as np
-
+from PyQt5.QtCore import QTimer
 
 class KiwoomUI(QMainWindow):
+    RQNAME_DAILY_CHART = "주식일봉차트조회"
+    
     def __init__(self):
         super().__init__()
 
@@ -32,31 +34,146 @@ class KiwoomUI(QMainWindow):
         self.account_tab = QWidget()
         self.tabs.addTab(self.account_tab, "계좌정보")
 
-        # # 조건검색 탭
-        # self.search_tab = QWidget()
-        # self.tabs.addTab(self.search_tab, "조건검색")
-
         # 탭 3 : 매수 후보군
         self.buy_tab = QWidget()
         self.tabs.addTab(self.buy_tab, "매수 후보군")
-
         
-
-        self.candidates_stocks = self.load_candidate_stocks()
-        self.current_stock_index = 0
-        self.filtered_stocks = []
-
-
-        # 조건에 맞는 종목 저장
-        self.filtered_stocks = []
-        self.all_stock_codes = ["005930", "035420", "068270"]  # 삼성전자, NAVER, 셀트리온 (예제 종목)
-        self.current_stock_index = 0
+        # 후보군 리스트 탭 
+        self.candidates_tab = QWidget()
+        self.tabs.addTab(self.candidates_tab, "후보군 리스트")
 
         # UI 설정
         self.setup_login_ui()
         self.setup_account_ui()
         self.setup_search_ui()
-        self.setup_buy_tap_ui()
+        self.setup_candidates_tab_ui()  # 새롭게 추가한 후보군 리스트 UI
+        
+        # 데이터 로드
+        self.candidates_stocks = self.load_candidate_stocks()
+        self.owned_stocks = set()  # 보유 종목 리스트
+        self.filtered_stocks = []
+
+        # 실시간 업데이트 타이머 설정 (2초마다 실행)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_stock_prices)
+        self.timer.start(2000)  # 2초마다 업데이트
+        
+    def setup_candidates_tab_ui(self):
+        """후보군 리스트 UI 설정"""
+        layout = QVBoxLayout()
+
+        # 종목 리스트 테이블
+        self.candidates_table = QTableWidget()
+        self.candidates_table.setColumnCount(4)  # 현재가, 20이평, 차이(금액), 차이(%)
+        self.candidates_table.setHorizontalHeaderLabels(["종목코드", "현재가", "20이평", "차이(금액)", "차이(%)"])
+        layout.addWidget(self.candidates_table)
+
+        self.candidates_tab.setLayout(layout)
+
+        # 초기 데이터 로드
+        self.load_candidates_list()
+        
+    def setup_candidates_tab_ui(self):
+        """후보군 리스트 UI 설정"""
+        layout = QVBoxLayout()
+
+        # 종목 리스트 테이블
+        self.candidates_table = QTableWidget()
+        self.candidates_table.setColumnCount(4)  # 현재가, 20이평, 차이(금액), 차이(%)
+        self.candidates_table.setHorizontalHeaderLabels(["종목코드", "현재가", "20이평", "차이(금액)", "차이(%)"])
+        layout.addWidget(self.candidates_table)
+
+        self.candidates_tab.setLayout(layout)
+
+        # 초기 데이터 로드
+        self.load_candidates_list()
+
+    def load_candidates_list(self):
+        """filtered_stocks.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
+        try:
+            with open("filtered_stocks.json", "r", encoding="utf-8") as file:
+                data = json.load(file)
+                all_stocks = data.get("stocks", [])
+
+            # 보유 종목 조회
+            self.get_holdings()
+
+            # 보유 종목 제외
+            self.candidates_stocks = [s for s in all_stocks if s["stock_code"] not in self.owned_stocks]
+
+            # 테이블에 추가
+            self.candidates_table.setRowCount(len(self.candidates_stocks))
+            for row, stock in enumerate(self.candidates_stocks):
+                self.candidates_table.setItem(row, 0, QTableWidgetItem(stock["stock_code"]))
+                self.candidates_table.setItem(row, 1, QTableWidgetItem("-"))  # 현재가 (실시간 업데이트 예정)
+                self.candidates_table.setItem(row, 2, QTableWidgetItem(str(round(stock["price"], 2))))  # 20이평
+                self.candidates_table.setItem(row, 3, QTableWidgetItem("-"))  # 차이 (금액)
+                self.candidates_table.setItem(row, 4, QTableWidgetItem("-"))  # 차이 (%)
+
+        except FileNotFoundError:
+            self.candidates_stocks = []
+            print("filtered_stocks.json 파일을 찾을 수 없습니다.")
+
+    def update_stock_prices(self):
+        """주기적으로 현재가를 가져와서 테이블 업데이트"""
+        for row, stock in enumerate(self.candidates_stocks):
+            stock_code = stock["stock_code"]
+
+            # 현재가 가져오기
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            if not current_price:
+                continue
+            current_price = int(current_price.replace(",", ""))  # 문자열을 정수로 변환
+
+            # 20이평 가격 가져오기
+            ma20_price = stock["price"]
+
+            # 차이 계산
+            diff_amount = current_price - ma20_price
+            diff_percent = (diff_amount / ma20_price) * 100
+
+            # 테이블 업데이트
+            self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
+            self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
+            self.candidates_table.setItem(row, 4, QTableWidgetItem(f"{diff_percent:.2f}%"))
+
+    def get_holdings(self):
+        """현재 보유 종목을 가져와서 owned_stocks에 저장"""
+        account_number = self.account_combo.currentText()
+        if not account_number:
+            return
+
+        self.owned_stocks.clear()
+
+        stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", "OPW00018", "보유종목조회")
+        for i in range(stock_count):
+            stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", "OPW00018", "보유종목조회", i, "종목코드").strip()
+            self.owned_stocks.add(stock_code)
+
+    def setup_buy_tab_ui(self):
+        """매수 후보군 UI 설정"""
+        layout = QVBoxLayout()
+
+        # 검색 버튼
+        self.search_button = QPushButton("매수 조건 검색")
+        self.search_button.clicked.connect(self.start_buy_search)
+        layout.addWidget(self.search_button)
+
+        # 결과 출력창
+        self.result_text = QTextEdit(self)
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+
+        self.buy_tab.setLayout(layout)
+
+    def load_candidate_stocks(self):
+        """매수 후보군 로드"""
+        try:
+            with open("filtered_stocks.json", "r", encoding="utf-8") as file:
+                data = json.load(file)
+                return data.get("stocks", [])
+        except FileNotFoundError:
+            return []
 
     def setup_buy_tap_ui(self):
         """ 매수 후보군 ui settings """
@@ -70,42 +187,34 @@ class KiwoomUI(QMainWindow):
         # 결과 출력창
         self.result_text = QTextEdit(self)
         self.result_text.setReadOnly(True)
-
-    def setup_search_ui(self):
-        """조건검색 UI 설정"""
-        layout = QVBoxLayout()
-
-        # 검색 버튼
-        self.search_button = QPushButton("조건 검색 실행")
-        self.search_button.clicked.connect(self.start_search)
-        layout.addWidget(self.search_button)
-
-        # 결과 출력창
-        self.result_text = QTextEdit(self)
-        self.result_text.setReadOnly(True)
         layout.addWidget(self.result_text)
-
-        self.search_tab.setLayout(layout)
-
-    def start_search(self):
-        """검색 시작"""
+        
+        self.buy_tab.setLayout(layout)
+        
+        
+    def start_buy_search(self):
+        """매수 후보 검색 실행"""
         self.filtered_stocks = []
         self.current_stock_index = 0
         self.result_text.setText("검색 중...")
+
+        if not self.candidates_stocks:
+            self.result_text.setText("저장된 후보 종목이 없습니다.")
+            return
 
         self.request_stock_data()
 
     def request_stock_data(self):
         """현재 종목의 일봉 데이터 요청"""
-        if self.current_stock_index >= len(self.all_stock_codes):
+        if self.current_stock_index >= len(self.candidates_stocks):
             self.result_text.setText("\n".join(self.filtered_stocks) if self.filtered_stocks else "조건에 맞는 종목 없음")
             return
 
-        stock_code = self.all_stock_codes[self.current_stock_index]
+        stock_code = self.candidates_stocks[self.current_stock_index]
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "기준일자", "20240301")  # 최근 일봉 기준
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "수정주가구분", "1")
-        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "OPT10081", 0, "0101")
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", self.RQNAME_DAILY_CHART, "OPT10081", 0, "0101")
 
     def setup_login_ui(self):
         """로그인/로그아웃 UI 설정"""
@@ -201,21 +310,6 @@ class KiwoomUI(QMainWindow):
         selected_account = self.account_combo.currentText()
         self.account_label.setText(f"선택된 계좌: {selected_account}")
 
-    def get_holdings(self):
-        """선택된 계좌의 보유 종목 조회 (TR: OPW00018)"""
-        account_number = self.account_combo.currentText()
-
-        if not account_number:
-            QMessageBox.warning(self, "경고", "계좌를 선택하세요.")
-            return
-
-        self.stock_text.setText("보유 종목 조회 중...")
-        
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "0000")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")
-        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목조회", "OPW00018", 0, "0101")
 
     def on_receive_tr_data(self, screen_no, rqname, trcode, recordname, prev_next, data_len, err_code, msg1, msg2):
         """TR 데이터 수신 이벤트"""
@@ -280,6 +374,24 @@ class KiwoomUI(QMainWindow):
             # 다음 종목 요청
             self.current_stock_index += 1
             self.request_stock_data()
+            
+    def process_daily_chart_data(self, trcode, rqname):
+        """일봉 데이터 수신 후 매수 조건 확인"""
+        count = 20 # 최근 20일 데이터 조회
+        prices = []
+        
+        for i in range(count):
+            close_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()
+            close_price = abs(int(close_price)) # 음수 처리 방지
+            prices.append(close_price)
+            
+        if len(prices) < 20:
+            self.current_stock_index += 1
+            self.request_stock_data()
+            return
+        
+        prices.reverse()
+        
 
 
 if __name__ == "__main__":
