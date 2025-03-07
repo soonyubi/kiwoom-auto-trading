@@ -19,7 +19,8 @@ def get_korea_stock_list():
         print(f"❌ KRX 종목 리스트 가져오기 실패: {e}")
         return []
 
-# ✅ 자동으로 종목 리스트 불러오기
+# ✅ 테스트를 위해 한 종목만 사용
+# STOCK_LIST = ["057030.KS"]
 STOCK_LIST = get_korea_stock_list()
 
 def fetch_multiple_stock_data(stock_codes, max_retries=3):
@@ -27,7 +28,7 @@ def fetch_multiple_stock_data(stock_codes, max_retries=3):
     retries = 0
     while retries < max_retries:
         try:
-            df = yf.download(stock_codes, period="30d", progress=False, group_by="ticker")
+            df = yf.download(stock_codes, period="60d", progress=False, group_by="ticker")
             if df.empty:
                 print("⛔ 가져온 데이터가 없습니다. (yfinance API 문제 또는 종목 코드 오류)")
                 return None
@@ -44,7 +45,10 @@ def check_conditions(df, stock_code):
     """조건을 만족하는지 확인하는 함수"""
     try:
         stock_df = df[stock_code]
+
+        # ✅ 데이터 개수 확인 (최소 20개 이상 필요)
         if stock_df.empty or len(stock_df) < 20:
+            print(f"❌ {stock_code}: 데이터 개수 부족 (현재 {len(stock_df)}개)")
             return None
 
         # ✅ 이동평균선 계산
@@ -52,21 +56,38 @@ def check_conditions(df, stock_code):
         stock_df["20_MA"] = stock_df["Close"].rolling(window=20).mean()
         stock_df["Volume_MA5"] = stock_df["Volume"].rolling(window=5).mean()
 
-        # ✅ 15 거래일 이내 5이평이 20이평을 뚫은 골든크로스 발생 확인
+        # ✅ NaN이 포함된 행 제거
+        stock_df = stock_df.dropna(subset=["5_MA", "20_MA", "Volume_MA5"])
+
+        # ✅ 데이터 개수 확인 (NaN 제거 후에도 최소 20개 이상 필요)
+        if stock_df.empty or len(stock_df) < 20:
+            print(f"❌ {stock_code}: NaN 제거 후 데이터 부족 (현재 {len(stock_df)}개)")
+            return None
+
+        # ✅ 골든크로스 확인 (15일 내 5이평이 20이평을 뚫은 경우)
         golden_cross = False
-        for i in range(1, 16):
-            if stock_df["5_MA"].iloc[-i - 1] < stock_df["20_MA"].iloc[-i - 1] and stock_df["5_MA"].iloc[-i] > stock_df["20_MA"].iloc[-i]:
+        for i in range(1, min(16, len(stock_df) - 1)):  # 데이터 개수 부족 방지
+            prev_5ma = stock_df["5_MA"].iloc[-i - 1]
+            prev_20ma = stock_df["20_MA"].iloc[-i - 1]
+            curr_5ma = stock_df["5_MA"].iloc[-i]
+            curr_20ma = stock_df["20_MA"].iloc[-i]
+
+            if prev_5ma < prev_20ma and curr_5ma > curr_20ma:
                 golden_cross = True
                 break
 
         if not golden_cross:
+            print(f"❌ {stock_code}: 15일 이내 골든크로스 없음")
             return None
 
         # ✅ 20일 이동평균선이 상승 중인지 확인
         if stock_df["20_MA"].iloc[-1] <= stock_df["20_MA"].iloc[-2]:
+            print(f"❌ {stock_code}: 20일 이동평균이 하락 중")
             return None
 
-        return {"stock_code": stock_code, "price": stock_df["Close"].iloc[-1]}
+        print(f"✅ {stock_code}: 조건 충족 (골든크로스 발생 & 20이평 상승)")
+
+        return {"stock_code": stock_code, "price": stock_df["20_MA"].iloc[-1]}  
     except Exception as e:
         print(f"⛔ {stock_code} 데이터 처리 중 오류 발생: {e}")
         return None
@@ -75,7 +96,7 @@ def filter_stocks():
     """조건을 만족하는 종목을 필터링하여 저장"""
     filtered_stocks = []
 
-    # ✅ ThreadPoolExecutor를 사용하여 병렬 처리 (max_workers 줄여서 요청 제한 방지)
+    # ✅ ThreadPoolExecutor를 사용하여 병렬 처리
     batch_size = 20  # 한 번에 가져올 종목 개수 (기존 50 → 20)
     stock_batches = [STOCK_LIST[i:i + batch_size] for i in range(0, len(STOCK_LIST), batch_size)]
 
