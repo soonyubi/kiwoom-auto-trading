@@ -5,6 +5,7 @@ import pandas as pd
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtWidgets import QApplication
 from datetime import datetime
+import os
 
 class Kiwoom:
     def __init__(self):
@@ -39,6 +40,8 @@ class Kiwoom:
         self.stock_data = []
         self.requesting_stock = stock_code
         self.data_received = False
+
+        os.makedirs("stock_data", exist_ok=True)
 
         # ✅ 최초 요청
         print(f"📢 {stock_code} 데이터 요청 시작...")
