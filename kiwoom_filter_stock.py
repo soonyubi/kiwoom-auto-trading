@@ -6,6 +6,7 @@ from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtWidgets import QApplication
 from datetime import datetime
 import os
+import time
 
 class Kiwoom:
     def __init__(self):
@@ -113,7 +114,7 @@ def filter_candidates():
                 continue
 
             # 20일 이동평균선 상승 중인지 확인
-            if df["20_MA"].iloc[-1] <= df["20_MA"].iloc[-2]:
+            if df["20_MA"].iloc[-1] <= df["20_MA"].iloc[-15]:
                 continue
 
             # 종가 기준 필터링
@@ -143,7 +144,8 @@ if __name__ == "__main__":
 
     stock_list = json.load(open("all_stock_codes.json", "r", encoding="utf-8"))
 
-    for stock_code in stock_list[:10]:  # 테스트용 10개 종목 실행
+    for stock_code in stock_list[:100]:  # 테스트용 10개 종목 실행
         kiwoom.get_stock_data(stock_code)
+        time.sleep(1)
 
     filter_candidates()

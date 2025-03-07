@@ -1,0 +1,48 @@
+{
+    "stocks": [
+        {
+            "stock_code": "030190",
+            "price": 12568.0
+        },
+        {
+            "stock_code": "010060",
+            "price": 79630.0
+        },
+        {
+            "stock_code": "005490",
+            "price": 264525.0
+        },
+        {
+            "stock_code": "475150",
+            "price": 14356.0
+        },
+        {
+            "stock_code": "003490",
+            "price": 23945.0
+        },
+        {
+            "stock_code": "018500",
+            "price": 1981.05
+        },
+        {
+            "stock_code": "001360",
+            "price": 1565.4
+        },
+        {
+            "stock_code": "020560",
+            "price": 10669.0
+        },
+        {
+            "stock_code": "192820",
+            "price": 162135.0
+        },
+        {
+            "stock_code": "284740",
+            "price": 20593.0
+        },
+        {
+            "stock_code": "017960",
+            "price": 14886.0
+        }
+    ]
+}
