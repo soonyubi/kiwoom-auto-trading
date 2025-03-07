@@ -16,49 +16,44 @@ class KiwoomUI(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Kiwoom 자동매매 프로그램")
-        self.setGeometry(100, 100, 600, 500)  # 창 크기 확대
+        self.setGeometry(100, 100, 800, 500)
 
         # Kiwoom API 객체 생성
         self.kiwoom = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
         self.kiwoom.OnEventConnect.connect(self.on_event_connect)
-        self.kiwoom.OnReceiveTrData.connect(self.on_receive_tr_data)  # TR 데이터 수신 이벤트 연결
 
         # 데이터 로드
-        self.candidates_stocks = self.load_candidate_stocks()
-        self.owned_stocks = set()  # 보유 종목 리스트
-        self.filtered_stocks = []
-
+        self.candidates_stocks = []
+        self.owned_stocks = set()
 
         # 탭 위젯 추가
         self.tabs = QTabWidget(self)
         self.setCentralWidget(self.tabs)
 
-        # 탭 1: 로그인 탭
+        # 탭 1: 로그인
         self.login_tab = QWidget()
         self.tabs.addTab(self.login_tab, "로그인")
 
-        # 탭 2: 계좌정보 및 보유 종목 탭
+        # 탭 2: 계좌정보
         self.account_tab = QWidget()
         self.tabs.addTab(self.account_tab, "계좌정보")
 
-        # 탭 3 : 매수 후보군
-        self.buy_tab = QWidget()
-        self.tabs.addTab(self.buy_tab, "매수 후보군")
-        
-        # 후보군 리스트 탭 
+        # 탭 3: 후보군 리스트
         self.candidates_tab = QWidget()
         self.tabs.addTab(self.candidates_tab, "후보군 리스트")
 
         # UI 설정
         self.setup_login_ui()
         self.setup_account_ui()
-        self.setup_candidates_tab_ui()  # 새롭게 추가한 후보군 리스트 UI
-        
+        self.setup_candidates_tab_ui()
 
-        # 실시간 업데이트 타이머 설정 (2초마다 실행)
+        # 실시간 업데이트 타이머 설정 (5초마다 실행)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stock_prices)
-        self.timer.start(2000)  # 2초마다 업데이트
+        self.timer.start(5000)
+
+        # ✅ 후보군 데이터 갱신
+        self.refresh_candidate_stocks()
         
     def setup_candidates_tab_ui(self):
         """후보군 리스트 UI 설정"""
@@ -66,15 +61,19 @@ class KiwoomUI(QMainWindow):
 
         # 종목 리스트 테이블
         self.candidates_table = QTableWidget()
-        self.candidates_table.setColumnCount(4)  # 현재가, 20이평, 차이(금액), 차이(%)
+        self.candidates_table.setColumnCount(5)  # 종목코드, 현재가, 20이평, 차이(금액), 차이(%)
         self.candidates_table.setHorizontalHeaderLabels(["종목코드", "현재가", "20이평", "차이(금액)", "차이(%)"])
         layout.addWidget(self.candidates_table)
+
+        # 후보군 업데이트 버튼
+        self.update_candidates_button = QPushButton("후보군 업데이트")
+        self.update_candidates_button.clicked.connect(self.refresh_candidate_stocks)
+        layout.addWidget(self.update_candidates_button)
 
         self.candidates_tab.setLayout(layout)
 
         # 초기 데이터 로드
         self.load_candidates_list()
-
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -111,7 +110,7 @@ class KiwoomUI(QMainWindow):
             current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
             if not current_price:
                 continue
-            current_price = int(current_price.replace(",", ""))  # 문자열을 정수로 변환
+            current_price = int(current_price.replace(",", ""))
 
             # 20이평 가격 가져오기
             ma20_price = stock["price"]
@@ -124,6 +123,11 @@ class KiwoomUI(QMainWindow):
             self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
             self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
             self.candidates_table.setItem(row, 4, QTableWidgetItem(f"{diff_percent:.2f}%"))
+
+    def refresh_candidate_stocks(self):
+        """후보군 데이터 갱신"""
+        filter_candidates()
+        self.load_candidates_list()
 
 
     def get_holdings(self):
@@ -381,7 +385,55 @@ class KiwoomUI(QMainWindow):
         
         prices.reverse()
         
+def filter_candidates():
+    """매수 후보군 필터링"""
+    filtered_candidates = []
+    
+    stock_list = json.load(open("all_stock_codes.json", "r", encoding="utf-8"))
 
+    for stock_code in stock_list:
+        try:
+            with open(f"stock_data/{stock_code}.json", "r", encoding="utf-8") as f:
+                stock_data = json.load(f)
+
+            df = pd.DataFrame(stock_data).sort_values("date")
+            df["5_MA"] = df["close"].rolling(window=5).mean()
+            df["20_MA"] = df["close"].rolling(window=20).mean()
+            df["Volume_MA5"] = df["volume"].rolling(window=5).mean()
+
+            # 최근 15일 내 5이평이 20이평을 돌파한 경우 필터링
+            golden_cross = False
+            for i in range(1, min(16, len(df))):
+                if df["5_MA"].iloc[-i - 1] < df["20_MA"].iloc[-i - 1] and df["5_MA"].iloc[-i] > df["20_MA"].iloc[-i]:
+                    golden_cross = True
+                    break
+            
+            if not golden_cross:
+                continue
+
+            # 20일 이동평균선이 상승 중인지 확인
+            if df["20_MA"].iloc[-1] <= df["20_MA"].iloc[-15]:
+                continue
+
+            # 종가 기준 필터링
+            last_close = df["close"].iloc[-1]
+            avg_volume_5 = df["Volume_MA5"].iloc[-1]
+
+            if 2000 <= last_close < 10000 and avg_volume_5 < 500000:
+                continue
+            if last_close >= 10000 and avg_volume_5 < 100000:
+                continue
+
+            filtered_candidates.append({"stock_code": stock_code, "price": df["20_MA"].iloc[-1]})
+
+        except FileNotFoundError:
+            continue
+
+    # ✅ JSON 파일로 저장
+    with open("filtered_candidates.json", "w", encoding="utf-8") as f:
+        json.dump({"stocks": filtered_candidates}, f, indent=4, ensure_ascii=False)
+
+    print(f"✅ {len(filtered_candidates)}개 종목이 조건을 만족했습니다. (filtered_candidates.json 저장 완료)")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
