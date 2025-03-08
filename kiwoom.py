@@ -104,27 +104,33 @@ class KiwoomUI(QMainWindow):
         self.auto_trade_timer.start(3000)
         
     def check_and_buy_stocks(self):
-        """자동 매수 실행"""
-        threshold = float(self.threshold_input.text()) / 100
-        buy_amount = int(self.buy_amount_input.text())
+    """자동 매수 실행"""
+    threshold = float(self.threshold_input.text()) / 100
+    buy_amount = int(self.buy_amount_input.text())
 
-        for stock in self.candidates_stocks:
-            stock_code = stock["stock_code"]
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+    for stock in self.candidates_stocks:
+        stock_code = stock["stock_code"]
 
-            if not current_price:
-                continue
+        # ✅ 이미 주문한 종목은 건너뛰기
+        if stock_code in self.pending_orders:
+            continue
 
-            current_price = int(current_price.replace(",", ""))
-            ma20_price = stock["price"]
+        current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
 
-            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
-            if abs((current_price - ma20_price) / ma20_price) <= threshold:
-                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
+        if not current_price:
+            continue
 
-                if order_id:
-                    self.pending_orders[stock_code] = order_id
-                    break
+        current_price = int(current_price.replace(",", ""))
+        ma20_price = stock["price"]
+
+        # 매수 조건 확인 (절대값 차이가 threshold % 이내)
+        if abs((current_price - ma20_price) / ma20_price) <= threshold:
+            order_id = self.place_buy_order(stock_code, current_price, buy_amount)
+
+            if order_id:
+                self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
+                print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
+                break  # 한 번에 하나의 종목만 주문하도록 제한
             
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
