@@ -23,12 +23,14 @@ class KiwoomUI(QMainWindow):
         # Kiwoom API 객체 생성
         self.kiwoom = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
         self.kiwoom.OnEventConnect.connect(self.on_event_connect)
+        self.kiwoom.OnReceiveChejanData.connect(self.on_receive_chejan_data)
 
         # 데이터 로드
         self.candidates_stocks = []
         self.owned_stocks = set()
         self.auto_buy_amount = 100000
         self.auto_buy_threshold = 0.8 / 100
+        self.pending_orders = {}
 
         # 탭 위젯 추가
         self.tabs = QTabWidget(self)
@@ -118,12 +120,11 @@ class KiwoomUI(QMainWindow):
 
             # 매수 조건 확인 (절대값 차이가 threshold % 이내)
             if abs((current_price - ma20_price) / ma20_price) <= threshold:
-                self.place_buy_order(stock_code, current_price, buy_amount)
+                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
 
-                # 매수 완료된 종목은 리스트에서 제거
-                self.candidates_stocks.remove(stock)
-                self.load_candidates_list()
-                break
+                if order_id:
+                    self.pending_orders[stock_code] = order_id
+                    break
             
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
@@ -136,8 +137,27 @@ class KiwoomUI(QMainWindow):
 
         print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가)")
 
-        self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+        order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
             ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
+
+        return order_id
+    
+    def on_receive_chejan_data(self, gubun, item_cnt, fid_list):
+        """체결 데이터 수신 이벤트"""
+        if gubun == "0":  # 주문체결
+            stock_code = self.kiwoom.dynamicCall("GetChejanData(int)", 9001).strip()  # 종목코드
+            order_status = self.kiwoom.dynamicCall("GetChejanData(int)", 913).strip()  # 체결 상태
+
+            if stock_code in self.pending_orders:
+                if order_status == "체결":
+                    print(f"✅ {stock_code} 체결 완료!")
+
+                    # 후보군 리스트에서도 삭제
+                    self.candidates_stocks = [s for s in self.candidates_stocks if s["stock_code"] != stock_code]
+                    self.load_candidates_list()
+
+                    # 체결된 종목 삭제
+                    del self.pending_orders[stock_code]
 
 
     def load_candidates_list(self):
