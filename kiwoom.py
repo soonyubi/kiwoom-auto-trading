@@ -145,6 +145,8 @@ class KiwoomUI(QMainWindow):
 
         order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
             ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
+        
+        self.request_account_balance()
 
         return order_id
     
@@ -165,6 +167,7 @@ class KiwoomUI(QMainWindow):
                     # 체결된 종목 삭제
                     del self.pending_orders[stock_code]
 
+                    self.request_account_balance()
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -389,8 +392,24 @@ class KiwoomUI(QMainWindow):
             self.account_combo.addItems(accounts)  # 계좌 목록을 드롭다운에 추가
             self.account_combo.setCurrentIndex(0)  # 첫 번째 계좌 선택
             self.account_label.setText(f"선택된 계좌: {accounts[0]}")
+            
+            self.request_account_balance()
         else:
             self.account_label.setText("계좌번호를 가져오지 못했습니다.")
+            
+    def request_account_balance(self):
+        """계좌 잔액 조회 요청"""
+        account_number = self.account_combo.currentText()
+        
+        if not account_number:
+            return
+
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "0000")  # 필요 시 비밀번호 입력
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "1")
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
+            
 
     def select_account(self):
         """사용자가 계좌를 선택하면 레이블 업데이트"""
@@ -412,6 +431,15 @@ class KiwoomUI(QMainWindow):
                 stock_info += f"종목명: {stock_name}, 수량: {quantity}, 매입가: {buy_price}\n"
 
             self.stock_text.setText(stock_info if stock_info else "보유 종목 없음")
+        
+        if rqname == "잔고조회":
+            balance = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+            
+            if balance:
+                balance = int(balance.replace(",", ""))  # 쉼표 제거 후 정수 변환
+                self.balance_label.setText(f"계좌 잔액: {balance:,}원")
+            else:
+                self.balance_label.setText("계좌 잔액: 조회 실패")
         
         if rqname == "주식일봉차트조회":
             count = 30  # 최근 30일 데이터 조회
