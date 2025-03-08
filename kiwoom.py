@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
     QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox,
-    QLineEdit, QSpinBox, QHBoxLayout
+    QLineEdit, QSpinBox, QHBoxLayout, QDoubleSpinBox
 )
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QAxContainer import QAxWidget
@@ -83,9 +83,10 @@ class KiwoomUI(QMainWindow):
         self.auto_trade_layout.addWidget(self.buy_amount_input)
 
         self.threshold_label = QLabel("매수 기준 차이 %:")
-        self.threshold_input = QSpinBox()
-        self.threshold_input.setRange(0, 5)  # 0~5% 설정 가능
-        self.threshold_input.setValue(int(self.auto_buy_threshold * 100))
+        self.threshold_input = QDoubleSpinBox()
+        self.threshold_input.setRange(0.0, 5.0)  # 0.0% ~ 5.0% 범위
+        self.threshold_input.setSingleStep(0.1)  # 0.1% 단위 증가/감소 가능
+        self.threshold_input.setValue(self.auto_buy_threshold * 100)  # 기존 값 유지
         self.auto_trade_layout.addWidget(self.threshold_label)
         self.auto_trade_layout.addWidget(self.threshold_input)
 
@@ -93,6 +94,11 @@ class KiwoomUI(QMainWindow):
         self.auto_trade_button = QPushButton("자동 매수 시작")
         self.auto_trade_button.clicked.connect(self.start_auto_trade)
         self.auto_trade_layout.addWidget(self.auto_trade_button)
+        
+        self.stop_trade_button = QPushButton("자동 매수 중지")
+        self.stop_trade_button.clicked.connect(self.stop_auto_trade)
+        self.auto_trade_layout.addWidget(self.stop_trade_button)
+        self.stop_trade_button.setEnabled(False)  # 초기에는 비활성화
 
         layout.addLayout(self.auto_trade_layout)
         self.candidates_tab.setLayout(layout)
@@ -102,6 +108,19 @@ class KiwoomUI(QMainWindow):
         self.auto_trade_timer = QTimer(self)
         self.auto_trade_timer.timeout.connect(self.check_and_buy_stocks)
         self.auto_trade_timer.start(3000)
+
+        self.auto_trade_button.setEnabled(False)  # "시작" 버튼 비활성화
+        self.stop_trade_button.setEnabled(True)   # "중지" 버튼 활성화
+        print("✅ 자동 매수 시작")
+        
+    def stop_auto_trade(self):
+        """자동 매수 중지"""
+        if hasattr(self, 'auto_trade_timer') and self.auto_trade_timer.isActive():
+            self.auto_trade_timer.stop()  # 타이머 중지
+            print("🛑 자동 매수 중지됨")
+
+        self.auto_trade_button.setEnabled(True)  # "시작" 버튼 활성화
+        self.stop_trade_button.setEnabled(False)
         
     def check_and_buy_stocks(self):
         """자동 매수 실행"""
@@ -146,6 +165,8 @@ class KiwoomUI(QMainWindow):
         order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
             ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
         
+        print(order_id)
+                
         if order_id:
             self.pending_orders[stock_code] = order_id  # 주문 중인 종목 추가
             QTimer.singleShot(2000, self.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
@@ -438,15 +459,21 @@ class KiwoomUI(QMainWindow):
             self.stock_text.setText(stock_info if stock_info else "보유 종목 없음")
         
         if rqname == "잔고조회":
-            balance = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
-            
-            if balance:
-                balance = int(balance.replace(",", ""))  # 쉼표 제거 후 정수 변환
-                self.balance_label.setText(f"계좌 잔액: {balance:,}원")
-                print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
+            balance_raw = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+
+            print(f"📥 잔고 조회 응답 수신: {balance_raw}")  # ✅ 응답 로그 추가
+
+            if balance_raw:
+                try:
+                    balance = int(balance_raw.replace(",", ""))  # 쉼표 제거 후 정수 변환
+                    self.balance_label.setText(f"계좌 잔액: {balance:,}원")
+                    print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
+                except ValueError:
+                    print(f"❌ 잔고 데이터 변환 실패: {balance_raw}")
+                    self.balance_label.setText("계좌 잔액: 변환 오류")
             else:
+                print("❌ 계좌 잔액 조회 실패 (데이터 없음)")
                 self.balance_label.setText("계좌 잔액: 조회 실패")
-                print("❌ 계좌 잔액 조회 실패")
         
         if rqname == "주식일봉차트조회":
             count = 30  # 최근 30일 데이터 조회
