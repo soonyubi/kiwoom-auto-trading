@@ -406,14 +406,21 @@ def filter_candidates():
             df["20_MA"] = df["close"].rolling(window=20).mean()
             df["Volume_MA5"] = df["volume"].rolling(window=5).mean()
 
-            # 최근 15일 내 5이평이 20이평을 돌파한 경우 필터링
+            # 최근 15일 내에서 5이평이 20이평보다 계속 작다가 골든크로스 발생 후 항상 위에 있어야 함
             golden_cross = False
-            for i in range(1, min(16, len(df))):
+            cross_index = -1  # 골든크로스 발생 인덱스 저장
+
+            for i in range(15, 0, -1):  # 최근 15일을 역순 탐색
+                if df["5_MA"].iloc[-i] < df["20_MA"].iloc[-i]:  
+                    continue  # 아직 5이평이 20이평보다 작음
+
                 if df["5_MA"].iloc[-i - 1] < df["20_MA"].iloc[-i - 1] and df["5_MA"].iloc[-i] > df["20_MA"].iloc[-i]:
                     golden_cross = True
+                    cross_index = -i  # 골든크로스 발생 인덱스 저장
                     break
-            
-            if not golden_cross:
+
+            # 골든크로스가 없거나, 이후 5이평이 20이평보다 작아지는 경우 제외
+            if not golden_cross or any(df["5_MA"].iloc[cross_index:] < df["20_MA"].iloc[cross_index:]):
                 continue
 
             ma20_last_15 = df["20_MA"].iloc[-15:].values  # NumPy 배열로 변환
