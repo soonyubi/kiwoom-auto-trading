@@ -104,33 +104,33 @@ class KiwoomUI(QMainWindow):
         self.auto_trade_timer.start(3000)
         
     def check_and_buy_stocks(self):
-    """자동 매수 실행"""
-    threshold = float(self.threshold_input.text()) / 100
-    buy_amount = int(self.buy_amount_input.text())
+        """자동 매수 실행"""
+        threshold = float(self.threshold_input.text()) / 100
+        buy_amount = int(self.buy_amount_input.text())
 
-    for stock in self.candidates_stocks:
-        stock_code = stock["stock_code"]
+        for stock in self.candidates_stocks:
+            stock_code = stock["stock_code"]
 
-        # ✅ 이미 주문한 종목은 건너뛰기
-        if stock_code in self.pending_orders:
-            continue
+            # ✅ 이미 주문한 종목은 건너뛰기
+            if stock_code in self.pending_orders:
+                continue
 
-        current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
 
-        if not current_price:
-            continue
+            if not current_price:
+                continue
 
-        current_price = int(current_price.replace(",", ""))
-        ma20_price = stock["price"]
+            current_price = int(current_price.replace(",", ""))
+            ma20_price = stock["price"]
 
-        # 매수 조건 확인 (절대값 차이가 threshold % 이내)
-        if abs((current_price - ma20_price) / ma20_price) <= threshold:
-            order_id = self.place_buy_order(stock_code, current_price, buy_amount)
+            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
+            if abs((current_price - ma20_price) / ma20_price) <= threshold:
+                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
 
-            if order_id:
-                self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
-                print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
-                break  # 한 번에 하나의 종목만 주문하도록 제한
+                if order_id:
+                    self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
+                    print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
+                    break  # 한 번에 하나의 종목만 주문하도록 제한
             
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
@@ -146,7 +146,9 @@ class KiwoomUI(QMainWindow):
         order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
             ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
         
-        self.request_account_balance()
+        if order_id:
+            self.pending_orders[stock_code] = order_id  # 주문 중인 종목 추가
+            QTimer.singleShot(2000, self.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
 
         return order_id
     
@@ -398,17 +400,20 @@ class KiwoomUI(QMainWindow):
             self.account_label.setText("계좌번호를 가져오지 못했습니다.")
             
     def request_account_balance(self):
-        """계좌 잔액 조회 요청"""
+        """잔고 조회 요청"""
         account_number = self.account_combo.currentText()
         
         if not account_number:
+            print("❌ 계좌번호를 선택하세요.")
             return
 
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "0000")  # 필요 시 비밀번호 입력
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "1")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")  # 2: 전체 잔고 조회
+
         self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
+        print("🔄 잔고 조회 요청 보냄...")
             
 
     def select_account(self):
@@ -438,8 +443,10 @@ class KiwoomUI(QMainWindow):
             if balance:
                 balance = int(balance.replace(",", ""))  # 쉼표 제거 후 정수 변환
                 self.balance_label.setText(f"계좌 잔액: {balance:,}원")
+                print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
             else:
                 self.balance_label.setText("계좌 잔액: 조회 실패")
+                print("❌ 계좌 잔액 조회 실패")
         
         if rqname == "주식일봉차트조회":
             count = 30  # 최근 30일 데이터 조회
