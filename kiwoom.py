@@ -3,7 +3,8 @@ import json
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
-    QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox
+    QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox,
+    QLineEdit, QSpinBox, QHBoxLayout
 )
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QAxContainer import QAxWidget
@@ -58,7 +59,7 @@ class KiwoomUI(QMainWindow):
         
     def setup_candidates_tab_ui(self):
         """후보군 리스트 UI 설정"""
-        layout = QVBoxLayout()
+        layout = QHBoxLayout()
 
         # 종목 리스트 테이블
         self.candidates_table = QTableWidget()
@@ -66,15 +67,76 @@ class KiwoomUI(QMainWindow):
         self.candidates_table.setHorizontalHeaderLabels(["종목코드", "현재가", "20이평", "차이(금액)", "차이(%)"])
         layout.addWidget(self.candidates_table)
 
-        # 후보군 업데이트 버튼
-        self.update_candidates_button = QPushButton("후보군 업데이트")
-        self.update_candidates_button.clicked.connect(self.refresh_candidate_stocks)
-        layout.addWidget(self.update_candidates_button)
+        # ✅ 자동 매수 설정 UI
+        self.auto_trade_layout = QVBoxLayout()
 
+        self.balance_label = QLabel("계좌 잔액: -")
+        self.auto_trade_layout.addWidget(self.balance_label)
+
+        self.buy_amount_label = QLabel("매수 금액:")
+        self.buy_amount_input = QLineEdit(str(self.auto_buy_amount))
+        self.auto_trade_layout.addWidget(self.buy_amount_label)
+        self.auto_trade_layout.addWidget(self.buy_amount_input)
+
+        self.threshold_label = QLabel("매수 기준 차이 %:")
+        self.threshold_input = QSpinBox()
+        self.threshold_input.setRange(0, 5)  # 0~5% 설정 가능
+        self.threshold_input.setValue(int(self.auto_buy_threshold * 100))
+        self.auto_trade_layout.addWidget(self.threshold_label)
+        self.auto_trade_layout.addWidget(self.threshold_input)
+
+        # 자동 매수 버튼
+        self.auto_trade_button = QPushButton("자동 매수 시작")
+        self.auto_trade_button.clicked.connect(self.start_auto_trade)
+        self.auto_trade_layout.addWidget(self.auto_trade_button)
+
+        layout.addLayout(self.auto_trade_layout)
         self.candidates_tab.setLayout(layout)
+        
+    def start_auto_trade(self):
+        """자동 매수 시작"""
+        self.auto_trade_timer = QTimer(self)
+        self.auto_trade_timer.timeout.connect(self.check_and_buy_stocks)
+        self.auto_trade_timer.start(3000)
+        
+    def check_and_buy_stocks(self):
+        """자동 매수 실행"""
+        threshold = float(self.threshold_input.text()) / 100
+        buy_amount = int(self.buy_amount_input.text())
 
-        # 초기 데이터 로드
-        # self.load_candidates_list()
+        for stock in self.candidates_stocks:
+            stock_code = stock["stock_code"]
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+
+            if not current_price:
+                continue
+
+            current_price = int(current_price.replace(",", ""))
+            ma20_price = stock["price"]
+
+            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
+            if abs((current_price - ma20_price) / ma20_price) <= threshold:
+                self.place_buy_order(stock_code, current_price, buy_amount)
+
+                # 매수 완료된 종목은 리스트에서 제거
+                self.candidates_stocks.remove(stock)
+                self.load_candidates_list()
+                break
+            
+    def place_buy_order(self, stock_code, price, amount):
+        """키움 OpenAPI를 통해 매수 주문 실행"""
+        account_number = self.account_combo.currentText()
+        quantity = amount // price  # 구매 가능한 수량 계산
+
+        if quantity < 1:
+            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가")
+            return
+
+        print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가)")
+
+        self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+            ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
+
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
