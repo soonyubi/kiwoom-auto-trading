@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
     QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox
 )
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QTimer
 import pandas as pd
