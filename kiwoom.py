@@ -27,6 +27,8 @@ class KiwoomUI(QMainWindow):
         # 데이터 로드
         self.candidates_stocks = []
         self.owned_stocks = set()
+        self.auto_buy_amount = 100000
+        self.auto_buy_threshold = 0.8 / 100
 
         # 탭 위젯 추가
         self.tabs = QTabWidget(self)
