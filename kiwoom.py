@@ -404,15 +404,10 @@ def filter_candidates():
             if not golden_cross:
                 continue
 
-            ma20_last_15 = df["20_MA"].iloc[-15:]  
-            num_up_days = sum(ma20_last_15[i] < ma20_last_15[i + 1] for i in range(len(ma20_last_15) - 1))  
-            ma20_15_days_ago = df["20_MA"].iloc[-15]  
-            ma20_today = df["20_MA"].iloc[-1] 
-            percent_increase = (ma20_today - ma20_15_days_ago) / ma20_15_days_ago 
+            ma20_last_15 = df["20_MA"].iloc[-15:]
+            is_recent_3days_upward = all(ma20_last_15[i] < ma20_last_15[i + 1] for i in range(-3, 0))
 
-            # ✅ 15일 중 10일 이상 상승하거나, // 0.5% 이상 상승하면 OK
-            is_ma20_upward = num_up_days >= 10 # or percent_increase >= 0.005
-            if not is_ma20_upward:
+            if not is_recent_3days_upward:
                 continue
 
             # 종가 기준 필터링
