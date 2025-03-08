@@ -123,7 +123,19 @@ class KiwoomUI(QMainWindow):
             # 테이블 업데이트
             self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
             self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
-            self.candidates_table.setItem(row, 4, QTableWidgetItem(f"{diff_percent:.2f}%"))
+
+            # 차이(%) 셀 생성
+            diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
+
+            # ✅ 색상 설정 (양수 = 빨강, 음수 = 파랑)
+            if diff_percent > 0:
+                red_intensity = min(255, int(255 * (diff_percent / 10)))  # 최대 10% 기준
+                diff_item.setBackground(QColor(255, 255 - red_intensity, 255 - red_intensity))  # 빨간색 계열
+            elif diff_percent < 0:
+                blue_intensity = min(255, int(255 * (-diff_percent / 10)))  # 최대 -10% 기준
+                diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
+
+            self.candidates_table.setItem(row, 4, diff_item)
 
     def refresh_candidate_stocks(self):
         """후보군 데이터 갱신"""
