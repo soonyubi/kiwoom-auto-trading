@@ -404,8 +404,9 @@ def filter_candidates():
             if not golden_cross:
                 continue
 
-            ma20_last_15 = df["20_MA"].iloc[-15:]
-            is_recent_3days_upward = all(ma20_last_15[i] < ma20_last_15[i + 1] for i in range(-3, 0))
+            ma20_last_15 = df["20_MA"].iloc[-15:].values  # NumPy 배열로 변환
+            # 최근 3일간 연속 상승하는지 확인
+            is_recent_3days_upward = all(ma20_last_15[i] < ma20_last_15[i + 1] for i in range(len(ma20_last_15) - 3, len(ma20_last_15) - 1))
 
             if not is_recent_3days_upward:
                 continue
