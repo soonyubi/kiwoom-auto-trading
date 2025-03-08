@@ -43,6 +43,182 @@
         {
             "stock_code": "017960",
             "price": 14886.0
+        },
+        {
+            "stock_code": "900290",
+            "price": 3999.75
+        },
+        {
+            "stock_code": "028300",
+            "price": 83875.0
+        },
+        {
+            "stock_code": "476080",
+            "price": 15044.0
+        },
+        {
+            "stock_code": "052220",
+            "price": 3682.0
+        },
+        {
+            "stock_code": "036620",
+            "price": 3305.0
+        },
+        {
+            "stock_code": "005710",
+            "price": 6088.0
+        },
+        {
+            "stock_code": "299170",
+            "price": 1750.75
+        },
+        {
+            "stock_code": "027040",
+            "price": 257.8
+        },
+        {
+            "stock_code": "060240",
+            "price": 467.9
+        },
+        {
+            "stock_code": "033170",
+            "price": 874.4
+        },
+        {
+            "stock_code": "074430",
+            "price": 936.9
+        },
+        {
+            "stock_code": "123010",
+            "price": 1615.85
+        },
+        {
+            "stock_code": "163280",
+            "price": 13539.0
+        },
+        {
+            "stock_code": "039200",
+            "price": 27897.5
+        },
+        {
+            "stock_code": "336570",
+            "price": 6201.5
+        },
+        {
+            "stock_code": "336060",
+            "price": 1302.55
+        },
+        {
+            "stock_code": "456070",
+            "price": 18439.0
+        },
+        {
+            "stock_code": "067000",
+            "price": 1602.95
+        },
+        {
+            "stock_code": "036930",
+            "price": 33967.5
+        },
+        {
+            "stock_code": "452300",
+            "price": 2757.5
+        },
+        {
+            "stock_code": "036170",
+            "price": 892.65
+        },
+        {
+            "stock_code": "064800",
+            "price": 1251.0
+        },
+        {
+            "stock_code": "009520",
+            "price": 13226.5
+        },
+        {
+            "stock_code": "078590",
+            "price": 626.75
+        },
+        {
+            "stock_code": "112190",
+            "price": 1249.0
+        },
+        {
+            "stock_code": "097950",
+            "price": 246650.0
+        },
+        {
+            "stock_code": "097230",
+            "price": 7026.0
+        },
+        {
+            "stock_code": "100840",
+            "price": 29650.0
+        },
+        {
+            "stock_code": "002710",
+            "price": 27455.0
+        },
+        {
+            "stock_code": "032350",
+            "price": 8006.5
+        },
+        {
+            "stock_code": "006660",
+            "price": 14864.5
+        },
+        {
+            "stock_code": "010140",
+            "price": 13844.5
+        },
+        {
+            "stock_code": "001430",
+            "price": 19399.5
+        },
+        {
+            "stock_code": "306200",
+            "price": 156070.0
+        },
+        {
+            "stock_code": "068270",
+            "price": 181255.0
+        },
+        {
+            "stock_code": "900140",
+            "price": 1682.6
+        },
+        {
+            "stock_code": "013360",
+            "price": 3268.5
+        },
+        {
+            "stock_code": "020120",
+            "price": 3381.0
+        },
+        {
+            "stock_code": "048550",
+            "price": 1468.05
+        },
+        {
+            "stock_code": "048470",
+            "price": 3376.25
+        },
+        {
+            "stock_code": "020180",
+            "price": 1126.25
+        },
+        {
+            "stock_code": "003310",
+            "price": 1560.0
+        },
+        {
+            "stock_code": "086820",
+            "price": 28942.5
+        },
+        {
+            "stock_code": "458650",
+            "price": 18719.0
         }
     ]
 }

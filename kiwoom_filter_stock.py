@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
     stock_list = json.load(open("all_stock_codes.json", "r", encoding="utf-8"))
 
-    for stock_code in stock_list[:100]:  # 테스트용 10개 종목 실행
+    for stock_code in stock_list: 
         kiwoom.get_stock_data(stock_code)
         time.sleep(1)
 

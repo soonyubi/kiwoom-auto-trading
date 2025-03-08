@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QTimer
+import pandas as pd
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -73,7 +74,7 @@ class KiwoomUI(QMainWindow):
         self.candidates_tab.setLayout(layout)
 
         # 초기 데이터 로드
-        self.load_candidates_list()
+        # self.load_candidates_list()
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -158,15 +159,6 @@ class KiwoomUI(QMainWindow):
         layout.addWidget(self.result_text)
 
         self.buy_tab.setLayout(layout)
-
-    def load_candidate_stocks(self):
-        """매수 후보군 로드"""
-        try:
-            with open("filtered_stocks.json", "r", encoding="utf-8") as file:
-                data = json.load(file)
-                return data.get("stocks", [])
-        except FileNotFoundError:
-            return []
 
     def setup_buy_tap_ui(self):
         """ 매수 후보군 ui settings """
@@ -390,9 +382,10 @@ def filter_candidates():
     filtered_candidates = []
     
     stock_list = json.load(open("all_stock_codes.json", "r", encoding="utf-8"))
-
+    
     for stock_code in stock_list:
         try:
+            
             with open(f"stock_data/{stock_code}.json", "r", encoding="utf-8") as f:
                 stock_data = json.load(f)
 
