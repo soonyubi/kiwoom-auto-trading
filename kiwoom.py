@@ -24,6 +24,7 @@ class KiwoomUI(QMainWindow):
         self.kiwoom = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
         self.kiwoom.OnEventConnect.connect(self.on_event_connect)
         self.kiwoom.OnReceiveChejanData.connect(self.on_receive_chejan_data)
+        self.kiwoom.OnReceiveTrData.connect(self.on_receive_tr_data)
 
         # 데이터 로드
         self.candidates_stocks = []
@@ -165,9 +166,8 @@ class KiwoomUI(QMainWindow):
         order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
             ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
         
-        print(order_id)
                 
-        if order_id:
+        if order_id==0:
             self.pending_orders[stock_code] = order_id  # 주문 중인 종목 추가
             QTimer.singleShot(2000, self.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
 
@@ -175,6 +175,7 @@ class KiwoomUI(QMainWindow):
     
     def on_receive_chejan_data(self, gubun, item_cnt, fid_list):
         """체결 데이터 수신 이벤트"""
+        print("on_receive_chejan_data called",gubun)
         if gubun == "0":  # 주문체결
             stock_code = self.kiwoom.dynamicCall("GetChejanData(int)", 9001).strip()  # 종목코드
             order_status = self.kiwoom.dynamicCall("GetChejanData(int)", 913).strip()  # 체결 상태
@@ -268,6 +269,7 @@ class KiwoomUI(QMainWindow):
         self.owned_stocks.clear()
 
         stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", "OPW00018", "보유종목조회")
+        print("보유 종목 조회 실행 : stock_count", stock_count)
         for i in range(stock_count):
             stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", "OPW00018", "보유종목조회", i, "종목코드").strip()
             self.owned_stocks.add(stock_code)
@@ -434,7 +436,7 @@ class KiwoomUI(QMainWindow):
         self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")  # 2: 전체 잔고 조회
 
         self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
-        print("🔄 잔고 조회 요청 보냄...")
+        print(f"🔄 잔고 조회 요청 보냄... account number: ${account_number}")
             
 
     def select_account(self):
@@ -445,6 +447,7 @@ class KiwoomUI(QMainWindow):
 
     def on_receive_tr_data(self, screen_no, rqname, trcode, recordname, prev_next, data_len, err_code, msg1, msg2):
         """TR 데이터 수신 이벤트"""
+        
         if rqname == "보유종목조회":
             stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
             stock_info = ""
