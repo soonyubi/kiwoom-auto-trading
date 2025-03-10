@@ -175,15 +175,20 @@ class KiwoomUI(QMainWindow):
     
     def on_receive_chejan_data(self, gubun, item_cnt, fid_list):
         """체결 데이터 수신 이벤트"""
-        if gubun == "0":  # 주문체결
+        if gubun == "0":  # 주문 체결
             stock_code = self.kiwoom.dynamicCall("GetChejanData(int)", 9001).strip()  # 종목코드
             order_status = self.kiwoom.dynamicCall("GetChejanData(int)", 913).strip()  # 체결 상태
+            order_price = self.kiwoom.dynamicCall("GetChejanData(int)", 910).strip()  # 주문 가격
+            executed_qty = self.kiwoom.dynamicCall("GetChejanData(int)", 911).strip()  # 체결 수량
+            remaining_qty = self.kiwoom.dynamicCall("GetChejanData(int)", 902).strip()  # 미체결 수량
+
+            print(f"📥 체결 이벤트 수신: {stock_code} | 상태: {order_status} | 주문가: {order_price} | 체결량: {executed_qty} | 미체결량: {remaining_qty}")
 
             if stock_code in self.pending_orders:
                 if order_status == "체결":
                     print(f"✅ {stock_code} 체결 완료!")
 
-                    # 후보군 리스트에서도 삭제
+                    # 후보군 리스트에서 삭제
                     self.candidates_stocks = [s for s in self.candidates_stocks if s["stock_code"] != stock_code]
                     self.load_candidates_list()
 
