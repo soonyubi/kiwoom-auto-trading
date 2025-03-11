@@ -11,33 +11,38 @@ from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QTimer
 import pandas as pd
 
+
 class AutoTrader:
     """자동 매매 기능을 담당하는 클래스"""
     def __init__(self, kiwoom, ui):
         self.kiwoom = kiwoom  # 키움 API 객체
         self.ui = ui  # UI 객체 참조
-        self.auto_trade_timer = None  # 자동 매매 타이머
+        self.auto_trade_timer = QTimer()  # ✅ 타이머를 미리 생성해둠
+        self.auto_trade_timer.timeout.connect(self.execute_limited_buy_orders)
         self.pending_orders = {}  # 주문 대기 목록
+        self.scheduled_orders = []  # 매수할 종목 리스트
+        self.order_index = 0  # 현재 주문 진행 인덱스
 
     def start_auto_trade(self):
         """자동 매수 시작"""
-        if not self.auto_trade_timer:
-            self.auto_trade_timer = QTimer()
-            self.auto_trade_timer.timeout.connect(self.check_and_buy_stocks)
-            self.auto_trade_timer.start(3000)
+        if self.auto_trade_timer.isActive():
+            print("⚠️ 자동 매수가 이미 실행 중입니다.")
+            return
 
         self.ui.auto_trade_button.setEnabled(False)  # 시작 버튼 비활성화
         self.ui.stop_trade_button.setEnabled(True)   # 중지 버튼 활성화
         print("✅ 자동 매수 시작")
 
+        self.check_and_buy_stocks()  # ✅ 종목 선정 후 주문 리스트 업데이트
+        self.auto_trade_timer.start(1000)  # ✅ 1초마다 주문 실행
+
     def stop_auto_trade(self):
         """자동 매수 중지"""
-        if self.auto_trade_timer and self.auto_trade_timer.isActive():
+        if self.auto_trade_timer.isActive():
             self.auto_trade_timer.stop()
-            print("🛑 자동 매수 중지됨")
-
+            print("🛑 자동 매수 종료됨")
         self.ui.auto_trade_button.setEnabled(True)  # 시작 버튼 활성화
-        self.ui.stop_trade_button.setEnabled(False)
+        self.ui.stop_trade_button.setEnabled(False)  # 중지 버튼 비활성화
 
     def check_and_buy_stocks(self):
         """자동 매수 실행 (1초에 1개씩 실행)"""
@@ -76,29 +81,19 @@ class AutoTrader:
         # ✅ 절대값 차이가 작은 순으로 정렬
         stocks_to_buy.sort(key=lambda x: x[2])
 
-        # ✅ 1초에 한 개씩 주문하도록 타이머 설정
+        # ✅ 주문할 종목 리스트 업데이트
         self.scheduled_orders = stocks_to_buy
         self.order_index = 0
 
-        if self.auto_trade_timer:
-            if self.auto_trade_timer.isActive():
-                print("기존 타이머 중지")
-                self.auto_trade_timer.stop()
-            print("타이머 객체 삭제 후 재생성")
-            self.auto_trade_timer.deleteLater()
-            self.auto_trade_timer = None
+        if not self.scheduled_orders:
+            print("🚫 매수할 종목이 없습니다. 자동 매수를 종료합니다.")
+            self.stop_auto_trade()
 
-        print("✅새로운 타이머 생성")
-        self.auto_trade_timer = QTimer()
-        self.auto_trade_timer.timeout.connect(self.execute_limited_buy_orders)
-        self.auto_trade_timer.start(1000)
-        
-            
     def execute_limited_buy_orders(self):
         """1초에 한 개씩 매수 주문 실행"""
         if not self.scheduled_orders or self.order_index >= len(self.scheduled_orders):
-            self.auto_trade_timer.stop()  # ✅ 더 이상 주문할 종목이 없으면 타이머 중지
-            print("🛑 더 이상 주문할 종목이 없습니다. 자동매수 중지")
+            print("🛑 더 이상 주문할 종목이 없습니다. 자동매수 종료")
+            self.stop_auto_trade()
             return
 
         stock_code, price, _ = self.scheduled_orders[self.order_index]
@@ -111,7 +106,6 @@ class AutoTrader:
             self.pending_orders[stock_code] = order_id
 
         self.order_index += 1  # ✅ 다음 주문 대기
-            
 
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
