@@ -202,6 +202,7 @@ class AccountManager:
         """사용자가 계좌를 선택하면 레이블 업데이트"""
         selected_account = self.ui.account_combo.currentText()
         self.ui.account_label.setText(f"선택된 계좌: {selected_account}")
+        self.ui.stock_data_manager.load_holdings_list()
         self.request_account_balance()
 
     def request_account_balance(self):
@@ -331,15 +332,20 @@ class RealtimeDataManager:
         self.ui = ui
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_stock_prices)
+        
+        self.holdings_timer = QTimer()
+        self.holdings_timer.timeout.connect(self.update_holdings_prices)
     
     def start_realtime_updates(self):
         """실시간 데이터 업데이트 시작"""
-        self.timer.start(5000)  # 5초마다 업데이트
+        self.timer.start(5000)  # 5초마다 후보군 종목 가격 업데이트
+        self.holdings_timer.start(5000)  # ✅ 보유 종목 가격 업데이트 5초마다 실행
         print("📡 실시간 주가 업데이트 시작")
 
     def stop_realtime_updates(self):
         """실시간 데이터 업데이트 중지"""
         self.timer.stop()
+        self.holdings_timer.stop()
         print("🛑 실시간 주가 업데이트 중지")
 
     def update_stock_prices(self):
