@@ -202,6 +202,61 @@ class StockDataManager:
         """후보군 데이터 갱신"""
         filter_candidates()
         self.load_candidates_list()
+        
+from PyQt5.QtCore import QTimer, QColor, QTableWidgetItem
+
+class RealtimeDataManager:
+    """실시간 데이터 업데이트 관리"""
+    def __init__(self, kiwoom, ui):
+        self.kiwoom = kiwoom
+        self.ui = ui
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_stock_prices)
+    
+    def start_realtime_updates(self):
+        """실시간 데이터 업데이트 시작"""
+        self.timer.start(5000)  # 5초마다 업데이트
+        print("📡 실시간 주가 업데이트 시작")
+
+    def stop_realtime_updates(self):
+        """실시간 데이터 업데이트 중지"""
+        self.timer.stop()
+        print("🛑 실시간 주가 업데이트 중지")
+
+    def update_stock_prices(self):
+        """주기적으로 현재가를 가져와서 테이블 업데이트"""
+        for row, stock in enumerate(self.ui.stock_data_manager.candidates_stocks):
+            stock_code = stock["stock_code"]
+
+            # 현재가 가져오기
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            if not current_price:
+                continue
+            current_price = int(current_price.replace(",", ""))
+
+            # 20이평 가격 가져오기
+            ma20_price = stock["price"]
+
+            # 차이 계산
+            diff_amount = current_price - ma20_price
+            diff_percent = (diff_amount / ma20_price) * 100
+
+            # 테이블 업데이트
+            self.ui.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
+            self.ui.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
+
+            # 차이(%) 셀 생성
+            diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
+
+            # ✅ 색상 설정 (양수 = 빨강, 음수 = 파랑)
+            if diff_percent > 0:
+                red_intensity = min(255, int(255 * (diff_percent / 10)))  # 최대 10% 기준
+                diff_item.setBackground(QColor(255, 255 - red_intensity, 255 - red_intensity))  # 빨간색 계열
+            elif diff_percent < 0:
+                blue_intensity = min(255, int(255 * (-diff_percent / 10)))  # 최대 -10% 기준
+                diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
+
+            self.ui.candidates_table.setItem(row, 4, diff_item)
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -226,6 +281,9 @@ class KiwoomUI(QMainWindow):
 
         # 종목 데이터 관리 객체 생성
         self.stock_data_manager = StockDataManager(self)
+        
+        # 실시간 데이터 관리 객체 생성
+        self.realtime_data_manager = RealtimeDataManager(self.kiwoom, self)
 
         # 데이터 로드
         self.candidates_stocks = []
@@ -240,7 +298,7 @@ class KiwoomUI(QMainWindow):
 
         # 실시간 업데이트 타이머 설정 (5초마다 실행)
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_stock_prices)
+        self.timer.timeout.connect(self.realtime_data_manager.update_stock_prices)
         self.timer.start(5000)
 
         # ✅ 후보군 데이터 갱신
@@ -334,41 +392,6 @@ class KiwoomUI(QMainWindow):
 
                     self.account_manager.request_account_balance()
 
-    def update_stock_prices(self):
-        """주기적으로 현재가를 가져와서 테이블 업데이트"""
-        for row, stock in enumerate(self.candidates_stocks):
-            stock_code = stock["stock_code"]
-
-            # 현재가 가져오기
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
-            if not current_price:
-                continue
-            current_price = int(current_price.replace(",", ""))
-
-            # 20이평 가격 가져오기
-            ma20_price = stock["price"]
-
-            # 차이 계산
-            diff_amount = current_price - ma20_price
-            diff_percent = (diff_amount / ma20_price) * 100
-
-            # 테이블 업데이트
-            self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
-            self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))
-
-            # 차이(%) 셀 생성
-            diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
-
-            # ✅ 색상 설정 (양수 = 빨강, 음수 = 파랑)
-            if diff_percent > 0:
-                red_intensity = min(255, int(255 * (diff_percent / 10)))  # 최대 10% 기준
-                diff_item.setBackground(QColor(255, 255 - red_intensity, 255 - red_intensity))  # 빨간색 계열
-            elif diff_percent < 0:
-                blue_intensity = min(255, int(255 * (-diff_percent / 10)))  # 최대 -10% 기준
-                diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
-
-            self.candidates_table.setItem(row, 4, diff_item)
-
 
     def get_holdings(self):
         """현재 보유 종목을 가져와서 owned_stocks에 저장"""
@@ -388,63 +411,6 @@ class KiwoomUI(QMainWindow):
         # ✅ TR 요청 실행 → on_receive_tr_data()가 호출되도록 설정
         self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목조회", "OPW00018", 0, "4000")
 
-
-    def setup_buy_tab_ui(self):
-        """매수 후보군 UI 설정"""
-        layout = QVBoxLayout()
-
-        # 검색 버튼
-        self.search_button = QPushButton("매수 조건 검색")
-        self.search_button.clicked.connect(self.start_buy_search)
-        layout.addWidget(self.search_button)
-
-        # 결과 출력창
-        self.result_text = QTextEdit(self)
-        self.result_text.setReadOnly(True)
-        layout.addWidget(self.result_text)
-
-        self.buy_tab.setLayout(layout)
-
-    def setup_buy_tap_ui(self):
-        """ 매수 후보군 ui settings """
-        layout = QVBoxLayout()
-
-        # 검색버튼
-        self.search_button = QPushButton("매수 조건 검색")
-        self.search_button.clicked.connect(self.start_buy_search)
-        layout.addWidget(self.search_button)
-
-        # 결과 출력창
-        self.result_text = QTextEdit(self)
-        self.result_text.setReadOnly(True)
-        layout.addWidget(self.result_text)
-        
-        self.buy_tab.setLayout(layout)
-        
-        
-    def start_buy_search(self):
-        """매수 후보 검색 실행"""
-        self.filtered_stocks = []
-        self.current_stock_index = 0
-        self.result_text.setText("검색 중...")
-
-        if not self.candidates_stocks:
-            self.result_text.setText("저장된 후보 종목이 없습니다.")
-            return
-
-        self.request_stock_data()
-
-    def request_stock_data(self):
-        """현재 종목의 일봉 데이터 요청"""
-        if self.current_stock_index >= len(self.candidates_stocks):
-            self.result_text.setText("\n".join(self.filtered_stocks) if self.filtered_stocks else "조건에 맞는 종목 없음")
-            return
-
-        stock_code = self.candidates_stocks[self.current_stock_index]
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "기준일자", "20240301")  # 최근 일봉 기준
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "수정주가구분", "1")
-        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", self.RQNAME_DAILY_CHART, "OPT10081", 0, "0101")
 
     def setup_login_ui(self):
         """로그인/로그아웃 UI 설정"""
@@ -543,71 +509,8 @@ class KiwoomUI(QMainWindow):
         if rqname == "잔고조회":
             self.account_manager.on_receive_tr_data(rqname, trcode)
         
-        if rqname == "주식일봉차트조회":
-            count = 30  # 최근 30일 데이터 조회
-            prices = []
-            volumes = []
-
-            for i in range(count):
-                close_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()
-                volume = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "거래량").strip()
-                
-                close_price = abs(int(close_price))  # 음수 처리 방지
-                volume = int(volume)
-
-                prices.append(close_price)
-                volumes.append(volume)
-
-            if len(prices) < 20:
-                self.current_stock_index += 1
-                self.request_stock_data()
-                return
-
-            # 이동평균선 계산
-            prices.reverse()
-            volumes.reverse()
-            ma5_list = np.convolve(prices, np.ones(5)/5, mode='valid')
-            ma20_list = np.convolve(prices, np.ones(20)/20, mode='valid')
-
-            # 최근 30일 평균 거래량
-            avg_volume_30 = np.mean(volumes)
-
-            # 조건 확인
-            last_ma5 = ma5_list[-1]
-            prev_ma5 = ma5_list[-2]
-            last_ma20 = ma20_list[-1]
-            prev_ma20 = ma20_list[-2]
-            prev_prev_ma5 = ma5_list[-3]
-
-            is_price_above_5000 = prices[-1] >= 5000
-            is_volume_above_100k = avg_volume_30 >= 100000
-            is_ma5_crossed_below_ma20 = prev_prev_ma5 > prev_ma20 and last_ma5 < last_ma20
-            is_ma20_upward = last_ma20 > prev_ma20
-
-            if is_price_above_5000 and is_volume_above_100k and is_ma5_crossed_below_ma20 and is_ma20_upward:
-                stock_code = self.all_stock_codes[self.current_stock_index]
-                self.filtered_stocks.append(f"{stock_code}: 현재가 {prices[-1]}, MA5 {last_ma5:.2f}, MA20 {last_ma20:.2f}")
-
-            # 다음 종목 요청
-            self.current_stock_index += 1
-            self.request_stock_data()
+      
             
-    def process_daily_chart_data(self, trcode, rqname):
-        """일봉 데이터 수신 후 매수 조건 확인"""
-        count = 20 # 최근 20일 데이터 조회
-        prices = []
-        
-        for i in range(count):
-            close_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()
-            close_price = abs(int(close_price)) # 음수 처리 방지
-            prices.append(close_price)
-            
-        if len(prices) < 20:
-            self.current_stock_index += 1
-            self.request_stock_data()
-            return
-        
-        prices.reverse()
         
 def filter_candidates():
     """매수 후보군 필터링"""
