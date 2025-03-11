@@ -109,6 +109,46 @@ class AccountManager:
         self.kiwoom = kiwoom  # 키움 API 객체
         self.ui = ui  # UI 객체 참조
         self.current_balance = None  # 현재 잔고
+        
+    
+    def get_holdings_from_tr(self, trcode, rqname):
+        """TR 데이터를 이용해 보유 종목 정보를 가져옴"""
+        try:
+            stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+            print(f"📥 보유 종목 조회 응답 수신: {stock_count}개 종목")
+
+            holdings = []
+            for i in range(stock_count):
+                stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
+                quantity = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량").strip()
+                buy_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가").strip()
+
+                holdings.append({"stock_name": stock_name, "quantity": quantity, "buy_price": buy_price})
+
+            return holdings  # 데이터 반환
+        except Exception as e:
+            print(f"❌ 보유 종목 조회 중 오류 발생: {e}")
+            return []
+        
+    
+    def get_holdings(self):
+        """현재 보유 종목을 가져와서 owned_stocks에 저장"""
+        account_number = self.ui.account_combo.currentText()
+        if not account_number:
+            print("❌ 계좌번호를 선택하세요.")
+            return
+
+        print(f"🔍 보유 종목 조회 요청 보냄... (계좌번호: {account_number})")
+
+        try:
+            self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
+            self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
+            self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+            self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "1")  # 1: 보유 종목 조회
+
+            self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목조회", "OPW00018", 0, "4000")
+        except Exception as e:
+            print(f"❌ 보유 종목 조회 중 오류 발생: {e}")
 
     def get_account_info(self):
         """로그인 후 계좌번호 가져오기"""
@@ -171,6 +211,11 @@ class StockDataManager:
     def __init__(self, ui):
         self.ui = ui
         self.candidates_stocks = []  # 종목 리스트 저장
+        
+    def remove_candidate(self, stock_code):
+        """체결된 종목을 후보군 리스트에서 제거"""
+        self.candidates_stocks = [s for s in self.candidates_stocks if s["stock_code"] != stock_code]
+        self.load_candidates_list()
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -300,6 +345,7 @@ class KiwoomUI(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.realtime_data_manager.update_stock_prices)
         self.timer.start(5000)
+        
 
         # ✅ 후보군 데이터 갱신
         self.stock_data_manager.refresh_candidate_stocks()
@@ -379,37 +425,17 @@ class KiwoomUI(QMainWindow):
 
             print(f"📥 체결 이벤트 수신: {stock_code} | 상태: {order_status} | 주문가: {order_price} | 체결량: {executed_qty} | 미체결량: {remaining_qty}")
 
-            if stock_code in self.pending_orders:
+            if stock_code in self.trader.pending_orders:
                 if order_status == "체결":
                     print(f"✅ {stock_code} 체결 완료!")
 
-                    # 후보군 리스트에서 삭제
-                    self.candidates_stocks = [s for s in self.candidates_stocks if s["stock_code"] != stock_code]
-                    self.load_candidates_list()
+                    # ✅ StockDataManager에서 종목 리스트 갱신 처리
+                    self.stock_data_manager.remove_candidate(stock_code)
 
-                    # 체결된 종목 삭제
-                    del self.pending_orders[stock_code]
+                    # ✅ 체결된 종목 삭제
+                    del self.trader.pending_orders[stock_code]
 
                     self.account_manager.request_account_balance()
-
-
-    def get_holdings(self):
-        """현재 보유 종목을 가져와서 owned_stocks에 저장"""
-        account_number = self.account_combo.currentText()
-        if not account_number:
-            print("❌ 계좌번호를 선택하세요.")
-            return
-
-        print(f"🔍 보유 종목 조회 요청 보냄... (계좌번호: {account_number})")
-
-        # TR 요청을 보내야 `on_receive_tr_data`가 호출됨
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "1")  # 1: 보유 종목 조회
-
-        # ✅ TR 요청 실행 → on_receive_tr_data()가 호출되도록 설정
-        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목조회", "OPW00018", 0, "4000")
 
 
     def setup_login_ui(self):
@@ -459,7 +485,7 @@ class KiwoomUI(QMainWindow):
         # 보유 종목 조회 버튼
         self.get_stocks_button = QPushButton("보유 종목 조회")
         self.get_stocks_button.setFont(QFont("Arial", 12))
-        self.get_stocks_button.clicked.connect(self.get_holdings)
+        self.get_stocks_button.clicked.connect(self.account_manager.get_holdings)
         layout.addWidget(self.get_stocks_button)
 
         # 보유 종목 리스트 출력
@@ -493,18 +519,14 @@ class KiwoomUI(QMainWindow):
         """TR 데이터 수신 이벤트"""
         print(f"📩 TR 데이터 수신: {rqname} (TR 코드: {trcode})")
         if rqname == "보유종목조회":
-            stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
-            print(f"📥 보유 종목 조회 응답 수신: {stock_count}개 종목")
-            stock_info = ""
+            holdings = self.account_manager.get_holdings_from_tr(trcode, rqname)  # ✅ AccountManager에서 데이터 가져옴
 
-            for i in range(stock_count):
-                stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
-                quantity = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량").strip()
-                buy_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가").strip()
+            if holdings:
+                stock_info = "\n".join([f"종목명: {h['stock_name']}, 수량: {h['quantity']}, 매입가: {h['buy_price']}" for h in holdings])
+            else:
+                stock_info = "보유 종목 없음"
 
-                stock_info += f"종목명: {stock_name}, 수량: {quantity}, 매입가: {buy_price}\n"
-
-            self.stock_text.setText(stock_info if stock_info else "보유 종목 없음")
+            self.stock_text.setText(stock_info)  # ✅ UI 업데이트만 수행
         
         if rqname == "잔고조회":
             self.account_manager.on_receive_tr_data(rqname, trcode)
