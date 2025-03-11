@@ -253,9 +253,10 @@ class StockDataManager:
         self.candidates_stocks = []  # 종목 리스트 저장
         
     def remove_candidate(self, stock_code):
-        """체결된 종목을 후보군 리스트에서 제거"""
+        """체결된 종목을 후보군 리스트와 UI에서 제거"""
         self.candidates_stocks = [s for s in self.candidates_stocks if s["stock_code"] != stock_code]
-        self.load_candidates_list()
+        self.load_candidates_list()  # ✅ UI 업데이트
+        print(f"📉 {stock_code} 종목이 UI에서 삭제됨")
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -473,8 +474,36 @@ class KiwoomUI(QMainWindow):
 
                     # ✅ 체결된 종목 삭제
                     del self.trader.pending_orders[stock_code]
+                    
+                    # ✅ 보유 종목 목록 업데이트
+                    self.account_manager.get_holdings()
 
+                    # ✅ 후보군 리스트에서 완전히 제거
+                    self.stock_data_manager.remove_from_filtered_candidates(stock_code)
+                    
+                    # ✅ UI 업데이트
+                    self.stock_data_manager.load_candidates_list()
+                    
+                    # ✅ 계좌 잔고 갱신
                     self.account_manager.request_account_balance()
+                    
+    def remove_from_filtered_candidates(self, stock_code):
+        """filtered_candidates.json에서 특정 종목을 제거"""
+        try:
+            with open("filtered_candidates.json", "r", encoding="utf-8") as file:
+                data = json.load(file)
+
+            # ✅ 체결된 종목을 리스트에서 제거
+            updated_stocks = [s for s in data.get("stocks", []) if s["stock_code"] != stock_code]
+
+            # ✅ 변경된 리스트 저장
+            with open("filtered_candidates.json", "w", encoding="utf-8") as file:
+                json.dump({"stocks": updated_stocks}, file, indent=4, ensure_ascii=False)
+
+            print(f"🗑 {stock_code} 후보군 리스트에서 삭제 완료 (filtered_candidates.json 업데이트)")
+
+        except FileNotFoundError:
+            print("❌ filtered_candidates.json 파일을 찾을 수 없습니다.")
 
 
     def setup_login_ui(self):
