@@ -283,6 +283,46 @@ class StockDataManager:
         filter_candidates()
         self.load_candidates_list()
         
+    def load_holdings_list(self):
+        """보유 종목 리스트를 가져와서 UI 테이블 업데이트"""
+        self.ui.account_manager.get_holdings()  # ✅ 보유 종목 정보 요청
+
+        holdings = self.ui.account_manager.owned_stocks  # 보유 종목 데이터
+
+        self.ui.holdings_table.setRowCount(len(holdings))
+
+        for row, stock in enumerate(holdings):
+            stock_code = stock["stock_code"]
+            stock_name = stock["stock_name"]
+            buy_price = int(stock["buy_price"].replace(",", ""))  # 매입평단가
+            quantity = int(stock["quantity"].replace(",", ""))
+
+            # ✅ 현재가 조회
+            current_price = self.ui.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            if not current_price:
+                current_price = 0
+            else:
+                current_price = int(current_price.replace(",", ""))
+
+            # ✅ 차이(%) 계산
+            price_diff = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
+
+            # ✅ 테이블에 값 추가
+            self.ui.holdings_table.setItem(row, 0, QTableWidgetItem(stock_name))
+            self.ui.holdings_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
+            self.ui.holdings_table.setItem(row, 2, QTableWidgetItem(str(buy_price)))
+            diff_item = QTableWidgetItem(f"{price_diff:.2f}%")
+
+            # ✅ 차이(%) 색상 설정 (양수=빨강, 음수=파랑)
+            if price_diff > 0:
+                diff_item.setBackground(QColor(255, 200, 200))  # 빨간색 계열
+            elif price_diff < 0:
+                diff_item.setBackground(QColor(200, 200, 255))  # 파란색 계열
+
+            self.ui.holdings_table.setItem(row, 3, diff_item)
+
+        print(f"✅ 보유 종목 {len(holdings)}개 UI 업데이트 완료")
+            
 
 class RealtimeDataManager:
     """실시간 데이터 업데이트 관리"""
@@ -336,6 +376,33 @@ class RealtimeDataManager:
                 diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
 
             self.ui.candidates_table.setItem(row, 4, diff_item)
+    
+    def update_holdings_prices(self):
+        """보유 종목의 현재가를 주기적으로 업데이트"""
+        for row in range(self.ui.holdings_table.rowCount()):
+            stock_code = self.ui.account_manager.owned_stocks[row]["stock_code"]
+
+            # ✅ 현재가 조회
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            if not current_price:
+                continue
+            current_price = int(current_price.replace(",", ""))
+
+            buy_price = int(self.ui.holdings_table.item(row, 2).text())  # 매입 평단가
+            price_diff = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
+
+            # ✅ UI 업데이트
+            self.ui.holdings_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
+            diff_item = QTableWidgetItem(f"{price_diff:.2f}%")
+
+            if price_diff > 0:
+                diff_item.setBackground(QColor(255, 200, 200))  # 빨간색 계열
+            elif price_diff < 0:
+                diff_item.setBackground(QColor(200, 200, 255))  # 파란색 계열
+
+            self.ui.holdings_table.setItem(row, 3, diff_item)
+
+        print("✅ 보유 종목 현재가 업데이트 완료")
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -363,6 +430,12 @@ class KiwoomUI(QMainWindow):
         
         # 실시간 데이터 관리 객체 생성
         self.realtime_data_manager = RealtimeDataManager(self.kiwoom, self)
+        
+         # ✅ 보유 종목 리스트 자동 로드
+        self.stock_data_manager.load_holdings_list()
+
+        # ✅ 실시간 업데이트 시작
+        self.realtime_data_manager.start_realtime_updates()
 
         # 데이터 로드
         self.candidates_stocks = []
@@ -393,15 +466,30 @@ class KiwoomUI(QMainWindow):
         self.login_tab = QWidget()
         self.account_tab = QWidget()
         self.candidates_tab = QWidget()
+        self.holdings_tab = QWidget() 
 
         self.tabs.addTab(self.login_tab, "로그인")
         self.tabs.addTab(self.account_tab, "계좌정보")
         self.tabs.addTab(self.candidates_tab, "후보군 리스트")
+        self.tabs.addTab(self.holdings_tab, "체결 리스트")
 
         # 개별 UI 설정 함수 호출
         self.setup_login_ui()
         self.setup_account_ui()
         self.setup_candidates_tab_ui()
+        self.setup_holdings_tab_ui()
+        
+    def setup_holdings_tab_ui(self):
+        """체결 리스트 UI 설정"""
+        layout = QVBoxLayout()
+
+        # ✅ 보유 종목 리스트 테이블 생성
+        self.holdings_table = QTableWidget()
+        self.holdings_table.setColumnCount(4)  # 종목명, 현재가, 매입평단가, 차이(%)
+        self.holdings_table.setHorizontalHeaderLabels(["종목명", "현재가", "매입평단가", "차이(%)"])
+        layout.addWidget(self.holdings_table)
+
+        self.holdings_tab.setLayout(layout)
 
         
     def setup_candidates_tab_ui(self):
