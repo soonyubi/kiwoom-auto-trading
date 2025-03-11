@@ -140,6 +140,16 @@ class AccountManager:
         self.current_balance = None  # 현재 잔고
         self.owned_stocks = set()
         
+    def on_account_changed(self):
+        """사용자가 계좌를 변경하면 해당 계좌의 보유 종목 조회"""
+        selected_account = self.ui.account_combo.currentText()
+        self.ui.account_label.setText(f"선택된 계좌: {selected_account}")
+        
+        # ✅ 선택된 계좌로 보유 종목 조회 실행
+        self.get_holdings()
+        
+        self.ui.stock_data_manager.load_holdings_list()
+        
     
     def get_holdings_from_tr(self, trcode, rqname):
         """TR 데이터를 이용해 보유 종목 정보를 가져옴"""
@@ -195,6 +205,8 @@ class AccountManager:
             self.ui.account_combo.setCurrentIndex(0)  # 첫 번째 계좌 선택
             self.ui.account_label.setText(f"선택된 계좌: {accounts[0]}")
             self.request_account_balance()  # 계좌 선택 후 잔고 조회
+            self.get_holdings()
+            self.ui.stock_data_manager.load_holdings_list()
         else:
             self.ui.account_label.setText("계좌번호를 가져오지 못했습니다.")
 
@@ -202,8 +214,8 @@ class AccountManager:
         """사용자가 계좌를 선택하면 레이블 업데이트"""
         selected_account = self.ui.account_combo.currentText()
         self.ui.account_label.setText(f"선택된 계좌: {selected_account}")
-        self.ui.stock_data_manager.load_holdings_list()
         self.request_account_balance()
+        self.get_holdings()
 
     def request_account_balance(self):
         """잔고 조회 요청"""
@@ -443,9 +455,6 @@ class KiwoomUI(QMainWindow):
         
 
         self.setup_ui()
-        
-         # ✅ 보유 종목 리스트 자동 로드
-        self.stock_data_manager.load_holdings_list()
 
         # ✅ 실시간 업데이트 시작
         self.realtime_data_manager.start_realtime_updates()
@@ -622,6 +631,8 @@ class KiwoomUI(QMainWindow):
         self.account_combo = QComboBox(self)
         self.account_combo.setFont(QFont("Arial", 12))
         layout.addWidget(self.account_combo)
+        
+        self.account_combo.currentIndexChanged.connect(self.account_manager.on_account_changed)
 
         # 선택된 계좌번호 표시
         self.account_label = QLabel("선택된 계좌: -")
