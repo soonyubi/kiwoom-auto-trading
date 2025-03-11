@@ -47,7 +47,7 @@ class AutoTrader:
         # 잔고 확인
         if not self.ui.current_balance:
             print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
-            self.ui.request_account_balance()
+            self.ui.account_manager.request_account_balance()
             return
 
         if self.ui.current_balance < buy_amount:
@@ -97,11 +97,74 @@ class AutoTrader:
         if order_id == 0:
             print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
             self.pending_orders[stock_code] = order_id
-            QTimer.singleShot(2000, self.ui.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
+            QTimer.singleShot(2000, self.ui.account_manager.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
         else:
             print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
 
         return order_id
+    
+class AccountManager:
+    """계좌 정보를 관리하는 클래스"""
+    def __init__(self, kiwoom, ui):
+        self.kiwoom = kiwoom  # 키움 API 객체
+        self.ui = ui  # UI 객체 참조
+        self.current_balance = None  # 현재 잔고
+
+    def get_account_info(self):
+        """로그인 후 계좌번호 가져오기"""
+        account_list = self.kiwoom.dynamicCall("GetLoginInfo(QString)", "ACCNO")
+        accounts = account_list.strip().split(';')[:-1]  # 마지막 빈 요소 제거
+
+        if accounts:
+            self.ui.account_combo.clear()
+            self.ui.account_combo.addItems(accounts)  # 계좌 목록을 드롭다운에 추가
+            self.ui.account_combo.setCurrentIndex(0)  # 첫 번째 계좌 선택
+            self.ui.account_label.setText(f"선택된 계좌: {accounts[0]}")
+            self.request_account_balance()  # 계좌 선택 후 잔고 조회
+        else:
+            self.ui.account_label.setText("계좌번호를 가져오지 못했습니다.")
+
+    def select_account(self):
+        """사용자가 계좌를 선택하면 레이블 업데이트"""
+        selected_account = self.ui.account_combo.currentText()
+        self.ui.account_label.setText(f"선택된 계좌: {selected_account}")
+        self.request_account_balance()
+
+    def request_account_balance(self):
+        """잔고 조회 요청"""
+        account_number = self.ui.account_combo.currentText()
+        
+        if not account_number:
+            print("❌ 계좌번호를 선택하세요.")
+            return
+
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")  # 2: 전체 잔고 조회
+
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
+        print(f"🔄 잔고 조회 요청 보냄... account number: {account_number}")
+
+    def on_receive_tr_data(self, rqname, trcode):
+        """TR 데이터 수신 이벤트 처리 (잔고 조회)"""
+        if rqname == "잔고조회":
+            balance_raw = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+
+            print(f"📥 잔고 조회 응답 수신: {balance_raw}")  # ✅ 응답 로그 추가
+
+            if balance_raw:
+                try:
+                    balance = int(balance_raw.replace(",", ""))  # 쉼표 제거 후 정수 변환
+                    self.ui.balance_label.setText(f"계좌 잔액: {balance:,}원")
+                    self.current_balance = balance
+                    print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
+                except ValueError:
+                    print(f"❌ 잔고 데이터 변환 실패: {balance_raw}")
+                    self.ui.balance_label.setText("계좌 잔액: 변환 오류")
+            else:
+                print("❌ 계좌 잔액 조회 실패 (데이터 없음)")
+                self.ui.balance_label.setText("계좌 잔액: 조회 실패")
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -117,6 +180,8 @@ class KiwoomUI(QMainWindow):
         self.kiwoom.OnEventConnect.connect(self.on_event_connect)
         self.kiwoom.OnReceiveChejanData.connect(self.on_receive_chejan_data)
         self.kiwoom.OnReceiveTrData.connect(self.on_receive_tr_data)
+        
+        self.account_manager = AccountManager(self.kiwoom, self)
 
         # 데이터 로드
         self.candidates_stocks = []
@@ -225,7 +290,7 @@ class KiwoomUI(QMainWindow):
                     # 체결된 종목 삭제
                     del self.pending_orders[stock_code]
 
-                    self.request_account_balance()
+                    self.account_manager.request_account_balance()
 
     def load_candidates_list(self):
         """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
@@ -411,7 +476,7 @@ class KiwoomUI(QMainWindow):
         # 계좌 선택 버튼
         self.select_account_button = QPushButton("계좌 선택")
         self.select_account_button.setFont(QFont("Arial", 12))
-        self.select_account_button.clicked.connect(self.select_account)
+        self.select_account_button.clicked.connect(self.account_manager.select_account)
         layout.addWidget(self.select_account_button)
 
         # 보유 종목 조회 버튼
@@ -442,46 +507,9 @@ class KiwoomUI(QMainWindow):
             self.status_label.setText("로그인 상태: 성공")
             self.login_button.setEnabled(False)
             self.logout_button.setEnabled(True)
-            self.get_account_info()
+            self.account_manager.get_account_info()
         else:
             self.status_label.setText(f"로그인 상태: 실패 (에러코드 {err_code})")
-
-    def get_account_info(self):
-        """로그인 후 계좌번호 가져오기"""
-        account_list = self.kiwoom.dynamicCall("GetLoginInfo(QString)", "ACCNO")
-        accounts = account_list.strip().split(';')[:-1]  # 마지막 빈 요소 제거
-
-        if accounts:
-            self.account_combo.clear()
-            self.account_combo.addItems(accounts)  # 계좌 목록을 드롭다운에 추가
-            self.account_combo.setCurrentIndex(0)  # 첫 번째 계좌 선택
-            self.account_label.setText(f"선택된 계좌: {accounts[0]}")
-            
-            self.request_account_balance()
-        else:
-            self.account_label.setText("계좌번호를 가져오지 못했습니다.")
-            
-    def request_account_balance(self):
-        """잔고 조회 요청"""
-        account_number = self.account_combo.currentText()
-        
-        if not account_number:
-            print("❌ 계좌번호를 선택하세요.")
-            return
-
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
-        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")  # 2: 전체 잔고 조회
-
-        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
-        print(f"🔄 잔고 조회 요청 보냄... account number: ${account_number}")
-            
-
-    def select_account(self):
-        """사용자가 계좌를 선택하면 레이블 업데이트"""
-        selected_account = self.account_combo.currentText()
-        self.account_label.setText(f"선택된 계좌: {selected_account}")
 
 
     def on_receive_tr_data(self, screen_no, rqname, trcode, recordname, prev_next, data_len, err_code, msg1, msg2):
@@ -502,22 +530,7 @@ class KiwoomUI(QMainWindow):
             self.stock_text.setText(stock_info if stock_info else "보유 종목 없음")
         
         if rqname == "잔고조회":
-            balance_raw = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
-
-            print(f"📥 잔고 조회 응답 수신: {balance_raw}")  # ✅ 응답 로그 추가
-
-            if balance_raw:
-                try:
-                    balance = int(balance_raw.replace(",", ""))  # 쉼표 제거 후 정수 변환
-                    self.balance_label.setText(f"계좌 잔액: {balance:,}원")
-                    self.current_balance = balance
-                    print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
-                except ValueError:
-                    print(f"❌ 잔고 데이터 변환 실패: {balance_raw}")
-                    self.balance_label.setText("계좌 잔액: 변환 오류")
-            else:
-                print("❌ 계좌 잔액 조회 실패 (데이터 없음)")
-                self.balance_label.setText("계좌 잔액: 조회 실패")
+            self.account_manager.on_receive_tr_data(rqname, trcode)
         
         if rqname == "주식일봉차트조회":
             count = 30  # 최근 30일 데이터 조회
