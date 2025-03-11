@@ -85,7 +85,7 @@ class AutoTrader:
         quantity = amount // price  # 구매 가능한 수량 계산
 
         if quantity < 1:
-            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가 (수량: {quantity})")
+            print(f"❌ {stock_code}: 구매금액({amount})보다 주식의 가격({price})이 높습니다. 구매 실패 (수량: {quantity})")
             return None
 
         print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가) 총 매수 금액 : {price * quantity:,} 원")
