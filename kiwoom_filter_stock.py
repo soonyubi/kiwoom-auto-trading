@@ -143,9 +143,11 @@ if __name__ == "__main__":
     kiwoom.login()
 
     stock_list = json.load(open("all_stock_codes.json", "r", encoding="utf-8"))
-
+    idx = 1
     for stock_code in stock_list: 
         kiwoom.get_stock_data(stock_code)
+        print(f"{len(stock_list)} 중 {idx} 개 만큼 완료. { int((idx/ len(stock_list) * 100))}%")
+        idx = idx+1
         time.sleep(0.3)
 
     filter_candidates()
