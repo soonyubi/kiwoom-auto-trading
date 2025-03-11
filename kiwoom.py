@@ -80,12 +80,19 @@ class AutoTrader:
         self.scheduled_orders = stocks_to_buy
         self.order_index = 0
 
-        if not self.auto_trade_timer:
-            self.auto_trade_timer = QTimer()
-            self.auto_trade_timer.timeout.connect(self.execute_limited_buy_orders)
+        if self.auto_trade_timer:
+            if self.auto_trade_timer.isActive():
+                print("기존 타이머 중지")
+                self.auto_trade_timer.stop()
+            print("타이머 객체 삭제 후 재생성")
+            self.auto_trade_timer.deleteLater()
+            self.auto_trade_timer = None
+
+        print("✅새로운 타이머 생성")
+        self.auto_trade_timer = QTimer()
+        self.auto_trade_timer.timeout.connect(self.execute_limited_buy_orders)
+        self.auto_trade_timer.start(1000)
         
-        if not self.auto_trade_timer.isActive():
-            self.auto_trade_timer.start(1000) 
             
     def execute_limited_buy_orders(self):
         """1초에 한 개씩 매수 주문 실행"""
