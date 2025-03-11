@@ -166,6 +166,43 @@ class AccountManager:
                 print("❌ 계좌 잔액 조회 실패 (데이터 없음)")
                 self.ui.balance_label.setText("계좌 잔액: 조회 실패")
 
+class StockDataManager:
+    """종목 데이터 로딩 및 관리"""
+    def __init__(self, ui):
+        self.ui = ui
+        self.candidates_stocks = []  # 종목 리스트 저장
+
+    def load_candidates_list(self):
+        """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
+        try:
+            with open("filtered_candidates.json", "r", encoding="utf-8") as file:
+                data = json.load(file)
+                all_stocks = data.get("stocks", [])
+
+            # 보유 종목 조회
+            self.ui.account_manager.get_holdings()
+
+            # 보유 종목 제외
+            self.candidates_stocks = [s for s in all_stocks if s["stock_code"] not in self.ui.account_manager.owned_stocks]
+
+            # 테이블에 추가
+            self.ui.candidates_table.setRowCount(len(self.candidates_stocks))
+            for row, stock in enumerate(self.candidates_stocks):
+                self.ui.candidates_table.setItem(row, 0, QTableWidgetItem(stock["stock_code"]))
+                self.ui.candidates_table.setItem(row, 1, QTableWidgetItem("-"))  # 현재가 (실시간 업데이트 예정)
+                self.ui.candidates_table.setItem(row, 2, QTableWidgetItem(str(round(stock["price"], 2))))  # 20이평
+                self.ui.candidates_table.setItem(row, 3, QTableWidgetItem("-"))  # 차이 (금액)
+                self.ui.candidates_table.setItem(row, 4, QTableWidgetItem("-"))  # 차이 (%)
+
+        except FileNotFoundError:
+            self.candidates_stocks = []
+            print("❌ filtered_candidates.json 파일을 찾을 수 없습니다.")
+
+    def refresh_candidate_stocks(self):
+        """후보군 데이터 갱신"""
+        filter_candidates()
+        self.load_candidates_list()
+
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
     
@@ -181,7 +218,14 @@ class KiwoomUI(QMainWindow):
         self.kiwoom.OnReceiveChejanData.connect(self.on_receive_chejan_data)
         self.kiwoom.OnReceiveTrData.connect(self.on_receive_tr_data)
         
+        # 계좌 관리 객체 생성
         self.account_manager = AccountManager(self.kiwoom, self)
+
+        # 자동매매 객체 생성
+        self.trader = AutoTrader(self.kiwoom, self)
+
+        # 종목 데이터 관리 객체 생성
+        self.stock_data_manager = StockDataManager(self)
 
         # 데이터 로드
         self.candidates_stocks = []
@@ -191,8 +235,6 @@ class KiwoomUI(QMainWindow):
         self.pending_orders = {}
         self.current_balance = None
         
-        # 자동매매 객체 생성
-        self.trader = AutoTrader(self.kiwoom, self)
 
         self.setup_ui()
 
@@ -202,7 +244,7 @@ class KiwoomUI(QMainWindow):
         self.timer.start(5000)
 
         # ✅ 후보군 데이터 갱신
-        self.refresh_candidate_stocks()
+        self.stock_data_manager.refresh_candidate_stocks()
         
     def setup_ui(self):
         """전체 UI 초기화"""
@@ -292,32 +334,6 @@ class KiwoomUI(QMainWindow):
 
                     self.account_manager.request_account_balance()
 
-    def load_candidates_list(self):
-        """filtered_candidates.json에서 종목을 불러와서 보유 종목을 제외하고 표시"""
-        try:
-            with open("filtered_candidates.json", "r", encoding="utf-8") as file:
-                data = json.load(file)
-                all_stocks = data.get("stocks", [])
-
-            # 보유 종목 조회
-            self.get_holdings()
-
-            # 보유 종목 제외
-            self.candidates_stocks = [s for s in all_stocks if s["stock_code"] not in self.owned_stocks]
-
-            # 테이블에 추가
-            self.candidates_table.setRowCount(len(self.candidates_stocks))
-            for row, stock in enumerate(self.candidates_stocks):
-                self.candidates_table.setItem(row, 0, QTableWidgetItem(stock["stock_code"]))
-                self.candidates_table.setItem(row, 1, QTableWidgetItem("-"))  # 현재가 (실시간 업데이트 예정)
-                self.candidates_table.setItem(row, 2, QTableWidgetItem(str(round(stock["price"], 2))))  # 20이평
-                self.candidates_table.setItem(row, 3, QTableWidgetItem("-"))  # 차이 (금액)
-                self.candidates_table.setItem(row, 4, QTableWidgetItem("-"))  # 차이 (%)
-
-        except FileNotFoundError:
-            self.candidates_stocks = []
-            print("❌ filtered_candidates.json 파일을 찾을 수 없습니다.")
-
     def update_stock_prices(self):
         """주기적으로 현재가를 가져와서 테이블 업데이트"""
         for row, stock in enumerate(self.candidates_stocks):
@@ -352,11 +368,6 @@ class KiwoomUI(QMainWindow):
                 diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
 
             self.candidates_table.setItem(row, 4, diff_item)
-
-    def refresh_candidate_stocks(self):
-        """후보군 데이터 갱신"""
-        filter_candidates()
-        self.load_candidates_list()
 
 
     def get_holdings(self):
