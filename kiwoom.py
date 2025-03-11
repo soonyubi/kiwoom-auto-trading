@@ -4,12 +4,104 @@ import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
     QWidget, QTabWidget, QTextEdit, QTableWidget, QTableWidgetItem, QComboBox,
-    QLineEdit, QSpinBox, QHBoxLayout, QDoubleSpinBox
+    QLineEdit, QSpinBox, QHBoxLayout, QDoubleSpinBox, QMessageBox
 )
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QTimer
 import pandas as pd
+
+class AutoTrader:
+    """자동 매매 기능을 담당하는 클래스"""
+    def __init__(self, kiwoom, ui):
+        self.kiwoom = kiwoom  # 키움 API 객체
+        self.ui = ui  # UI 객체 참조
+        self.auto_trade_timer = None  # 자동 매매 타이머
+        self.pending_orders = {}  # 주문 대기 목록
+
+    def start_auto_trade(self):
+        """자동 매수 시작"""
+        if not self.auto_trade_timer:
+            self.auto_trade_timer = QTimer()
+            self.auto_trade_timer.timeout.connect(self.check_and_buy_stocks)
+            self.auto_trade_timer.start(3000)
+
+        self.ui.auto_trade_button.setEnabled(False)  # 시작 버튼 비활성화
+        self.ui.stop_trade_button.setEnabled(True)   # 중지 버튼 활성화
+        print("✅ 자동 매수 시작")
+
+    def stop_auto_trade(self):
+        """자동 매수 중지"""
+        if self.auto_trade_timer and self.auto_trade_timer.isActive():
+            self.auto_trade_timer.stop()
+            print("🛑 자동 매수 중지됨")
+
+        self.ui.auto_trade_button.setEnabled(True)  # 시작 버튼 활성화
+        self.ui.stop_trade_button.setEnabled(False)
+
+    def check_and_buy_stocks(self):
+        """자동 매수 실행"""
+        threshold = float(self.ui.threshold_input.text()) / 100
+        buy_amount = int(self.ui.buy_amount_input.text())
+
+        # 잔고 확인
+        if not self.ui.current_balance:
+            print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
+            self.ui.request_account_balance()
+            return
+
+        if self.ui.current_balance < buy_amount:
+            print(f"❌ 잔고 부족: {self.ui.current_balance}원, 필요한 금액: {buy_amount}원")
+            return
+
+        for stock in self.ui.candidates_stocks:
+            stock_code = stock["stock_code"]
+
+            # 이미 주문한 종목은 건너뛰기
+            if stock_code in self.pending_orders:
+                continue
+
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+
+            if not current_price:
+                continue
+
+            current_price = int(current_price.replace(",", ""))
+            ma20_price = stock["price"]
+
+            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
+            if abs((current_price - ma20_price) / ma20_price) <= threshold:
+                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
+
+                if order_id == 0:
+                    self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
+                    print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
+                    break  # 한 번에 하나의 종목만 주문하도록 제한
+
+    def place_buy_order(self, stock_code, price, amount):
+        """키움 OpenAPI를 통해 매수 주문 실행"""
+        account_number = self.ui.account_combo.currentText()
+        quantity = amount // price  # 구매 가능한 수량 계산
+
+        if quantity < 1:
+            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가 (수량: {quantity})")
+            return None
+
+        print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가) 총 매수 금액 : {price * quantity:,} 원")
+
+        order_id = self.kiwoom.dynamicCall(
+            "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+            ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""]
+        )
+
+        if order_id == 0:
+            print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
+            self.pending_orders[stock_code] = order_id
+            QTimer.singleShot(2000, self.ui.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
+        else:
+            print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
+
+        return order_id
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -33,6 +125,9 @@ class KiwoomUI(QMainWindow):
         self.auto_buy_threshold = 0.8 / 100
         self.pending_orders = {}
         self.current_balance = None
+        
+        # 자동매매 객체 생성
+        self.trader = AutoTrader(self.kiwoom, self)
 
         self.setup_ui()
 
@@ -95,100 +190,17 @@ class KiwoomUI(QMainWindow):
 
         # 자동 매수 버튼
         self.auto_trade_button = QPushButton("자동 매수 시작")
-        self.auto_trade_button.clicked.connect(self.start_auto_trade)
+        self.auto_trade_button.clicked.connect(self.trader.start_auto_trade)
         self.auto_trade_layout.addWidget(self.auto_trade_button)
         
         self.stop_trade_button = QPushButton("자동 매수 중지")
-        self.stop_trade_button.clicked.connect(self.stop_auto_trade)
+        self.stop_trade_button.clicked.connect(self.trader.stop_auto_trade)
         self.auto_trade_layout.addWidget(self.stop_trade_button)
         self.stop_trade_button.setEnabled(False)  # 초기에는 비활성화
 
         layout.addLayout(self.auto_trade_layout)
         self.candidates_tab.setLayout(layout)
         
-    def start_auto_trade(self):
-        """자동 매수 시작"""
-        self.auto_trade_timer = QTimer(self)
-        self.auto_trade_timer.timeout.connect(self.check_and_buy_stocks)
-        self.auto_trade_timer.start(3000)
-
-        self.auto_trade_button.setEnabled(False)  # "시작" 버튼 비활성화
-        self.stop_trade_button.setEnabled(True)   # "중지" 버튼 활성화
-        print("✅ 자동 매수 시작")
-        
-    def stop_auto_trade(self):
-        """자동 매수 중지"""
-        if hasattr(self, 'auto_trade_timer') and self.auto_trade_timer.isActive():
-            self.auto_trade_timer.stop()  # 타이머 중지
-            print("🛑 자동 매수 중지됨")
-
-        self.auto_trade_button.setEnabled(True)  # "시작" 버튼 활성화
-        self.stop_trade_button.setEnabled(False)
-        
-    def check_and_buy_stocks(self):
-        """자동 매수 실행"""
-        threshold = float(self.threshold_input.text()) / 100
-        buy_amount = int(self.buy_amount_input.text())
-
-        # ✅ 잔고 확인 (최신 잔고가 없는 경우 조회)
-        if not hasattr(self, 'current_balance') or self.current_balance is None:
-            print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
-            self.request_account_balance()
-            return
-
-        if self.current_balance < buy_amount:
-            print(f"❌ 잔고 부족: {self.current_balance}원, 필요한 금액: {buy_amount}원")
-            return
-
-        for stock in self.candidates_stocks:
-            stock_code = stock["stock_code"]
-
-            # ✅ 이미 주문한 종목은 건너뛰기
-            if stock_code in self.pending_orders:
-                continue
-
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
-
-            if not current_price:
-                continue
-
-            current_price = int(current_price.replace(",", ""))
-            ma20_price = stock["price"]
-
-            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
-            if abs((current_price - ma20_price) / ma20_price) <= threshold:
-                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
-
-                if order_id==0:
-                    self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
-                    print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
-                    break  # 한 번에 하나의 종목만 주문하도록 제한
-            
-    
-    def place_buy_order(self, stock_code, price, amount):
-        """키움 OpenAPI를 통해 매수 주문 실행"""
-        account_number = self.account_combo.currentText()
-        quantity = amount // price  # 구매 가능한 수량 계산
-
-        if quantity < 1:
-            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가 (수량: {quantity})")
-            return None
-
-        print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가) 총 매수 금액 : {price * quantity:,} 원")
-
-        order_id = self.kiwoom.dynamicCall(
-            "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
-            ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""]
-        )
-
-        if order_id == 0:
-            print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
-            self.pending_orders[stock_code] = order_id
-            QTimer.singleShot(2000, self.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
-        else:
-            print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
-
-        return order_id
     
     def on_receive_chejan_data(self, gubun, item_cnt, fid_list):
         """체결 데이터 수신 이벤트"""
