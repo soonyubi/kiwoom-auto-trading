@@ -594,6 +594,9 @@ def filter_candidates():
             last_close = df["close"].iloc[-1]
             avg_volume_5 = df["Volume_MA5"].iloc[-1]
 
+            if last_close < 2000:
+                continue
+
             if 2000 <= last_close < 10000 and avg_volume_5 < 500000:
                 continue
             if last_close >= 10000 and avg_volume_5 < 100000:
