@@ -430,23 +430,19 @@ class KiwoomUI(QMainWindow):
         
         # 실시간 데이터 관리 객체 생성
         self.realtime_data_manager = RealtimeDataManager(self.kiwoom, self)
+
+        # 데이터 로드
+        self.auto_buy_amount = 100000
+        self.auto_buy_threshold = 0.8 / 100
+        
+
+        self.setup_ui()
         
          # ✅ 보유 종목 리스트 자동 로드
         self.stock_data_manager.load_holdings_list()
 
         # ✅ 실시간 업데이트 시작
         self.realtime_data_manager.start_realtime_updates()
-
-        # 데이터 로드
-        self.candidates_stocks = []
-        self.owned_stocks = set()
-        self.auto_buy_amount = 100000
-        self.auto_buy_threshold = 0.8 / 100
-        self.pending_orders = {}
-        self.current_balance = None
-        
-
-        self.setup_ui()
 
         # 실시간 업데이트 타이머 설정 (5초마다 실행)
         self.timer = QTimer(self)
