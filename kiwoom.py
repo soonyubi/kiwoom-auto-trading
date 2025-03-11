@@ -40,11 +40,10 @@ class AutoTrader:
         self.ui.stop_trade_button.setEnabled(False)
 
     def check_and_buy_stocks(self):
-        """자동 매수 실행 (1초에 4개 제한)"""
+        """자동 매수 실행 (1초에 1개씩 실행)"""
         threshold = float(self.ui.threshold_input.text()) / 100
         buy_amount = int(self.ui.buy_amount_input.text())
 
-        # 잔고 확인
         if not self.ui.account_manager.current_balance:
             print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
             self.ui.account_manager.request_account_balance()
@@ -53,48 +52,58 @@ class AutoTrader:
         if self.ui.account_manager.current_balance < buy_amount:
             print(f"❌ 잔고 부족: {self.ui.account_manager.current_balance}원, 필요한 금액: {buy_amount}원")
             return
-        
+
         stocks_to_buy = []
 
         for stock in self.ui.stock_data_manager.candidates_stocks:
             stock_code = stock["stock_code"]
 
-            # 이미 주문한 종목은 건너뛰기
-            if stock_code in self.pending_orders:
+            if stock_code in self.pending_orders:  # 이미 주문한 종목은 제외
                 continue
 
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()            
-
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
             if not current_price:
                 continue
 
             current_price = int(current_price.replace(",", ""))
             ma20_price = stock["price"]
-            
-            price_diff = abs(current_price - ma20_price) / ma20_price
-            
+
+            price_diff = abs((current_price - ma20_price) / ma20_price)
+
             if price_diff <= threshold:
                 stocks_to_buy.append((stock_code, current_price, price_diff))
-                
-            stocks_to_buy.sort(key=lambda x: x[2])
-            self.execute_limited_buy_orders(stocks_to_buy[:4])
+
+        # ✅ 절대값 차이가 작은 순으로 정렬
+        stocks_to_buy.sort(key=lambda x: x[2])
+
+        # ✅ 1초에 한 개씩 주문하도록 타이머 설정
+        self.scheduled_orders = stocks_to_buy
+        self.order_index = 0
+
+        if not self.auto_trade_timer:
+            self.auto_trade_timer = QTimer()
+            self.auto_trade_timer.timeout.connect(self.execute_limited_buy_orders)
+        
+        if not self.auto_trade_timer.isActive():
+            self.auto_trade_timer.start(1000) 
             
-    def execute_limited_buy_orders(self, stocks):
-        """1초당 4개씩 매수 주문 실행"""
-        if not stocks:
+    def execute_limited_buy_orders(self):
+        """1초에 한 개씩 매수 주문 실행"""
+        if not self.scheduled_orders or self.order_index >= len(self.scheduled_orders):
+            self.auto_trade_timer.stop()  # ✅ 더 이상 주문할 종목이 없으면 타이머 중지
+            print("🛑 더 이상 주문할 종목이 없습니다. 자동매수 중지")
             return
 
-        stock_code, price, _ = stocks.pop(0)  # 첫 번째 종목 꺼내기
+        stock_code, price, _ = self.scheduled_orders[self.order_index]
         buy_amount = int(self.ui.buy_amount_input.text())
+
         order_id = self.place_buy_order(stock_code, price, buy_amount)
 
         if order_id == 0:
             print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
             self.pending_orders[stock_code] = order_id
 
-        # ✅ 1초 후 다음 주문 실행 (최대 4개)
-        if stocks:
-            QTimer.singleShot(1000, lambda: self.execute_limited_buy_orders(stocks))
+        self.order_index += 1  # ✅ 다음 주문 대기
             
 
     def place_buy_order(self, stock_code, price, amount):
