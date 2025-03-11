@@ -34,26 +34,7 @@ class KiwoomUI(QMainWindow):
         self.pending_orders = {}
         self.current_balance = None
 
-        # 탭 위젯 추가
-        self.tabs = QTabWidget(self)
-        self.setCentralWidget(self.tabs)
-
-        # 탭 1: 로그인
-        self.login_tab = QWidget()
-        self.tabs.addTab(self.login_tab, "로그인")
-
-        # 탭 2: 계좌정보
-        self.account_tab = QWidget()
-        self.tabs.addTab(self.account_tab, "계좌정보")
-
-        # 탭 3: 후보군 리스트
-        self.candidates_tab = QWidget()
-        self.tabs.addTab(self.candidates_tab, "후보군 리스트")
-
-        # UI 설정
-        self.setup_login_ui()
-        self.setup_account_ui()
-        self.setup_candidates_tab_ui()
+        self.setup_ui()
 
         # 실시간 업데이트 타이머 설정 (5초마다 실행)
         self.timer = QTimer(self)
@@ -62,6 +43,26 @@ class KiwoomUI(QMainWindow):
 
         # ✅ 후보군 데이터 갱신
         self.refresh_candidate_stocks()
+        
+    def setup_ui(self):
+        """전체 UI 초기화"""
+        self.tabs = QTabWidget(self)
+        self.setCentralWidget(self.tabs)
+
+        # 각 탭 추가
+        self.login_tab = QWidget()
+        self.account_tab = QWidget()
+        self.candidates_tab = QWidget()
+
+        self.tabs.addTab(self.login_tab, "로그인")
+        self.tabs.addTab(self.account_tab, "계좌정보")
+        self.tabs.addTab(self.candidates_tab, "후보군 리스트")
+
+        # 개별 UI 설정 함수 호출
+        self.setup_login_ui()
+        self.setup_account_ui()
+        self.setup_candidates_tab_ui()
+
         
     def setup_candidates_tab_ui(self):
         """후보군 리스트 UI 설정"""
