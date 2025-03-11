@@ -40,7 +40,7 @@ class AutoTrader:
         self.ui.stop_trade_button.setEnabled(False)
 
     def check_and_buy_stocks(self):
-        """자동 매수 실행"""
+        """자동 매수 실행 (1초에 4개 제한)"""
         threshold = float(self.ui.threshold_input.text()) / 100
         buy_amount = int(self.ui.buy_amount_input.text())
 
@@ -53,6 +53,8 @@ class AutoTrader:
         if self.ui.account_manager.current_balance < buy_amount:
             print(f"❌ 잔고 부족: {self.ui.account_manager.current_balance}원, 필요한 금액: {buy_amount}원")
             return
+        
+        stocks_to_buy = []
 
         for stock in self.ui.stock_data_manager.candidates_stocks:
             stock_code = stock["stock_code"]
@@ -61,23 +63,39 @@ class AutoTrader:
             if stock_code in self.pending_orders:
                 continue
 
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
-            
+            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()            
 
             if not current_price:
                 continue
 
             current_price = int(current_price.replace(",", ""))
             ma20_price = stock["price"]
+            
+            price_diff = abs(current_price - ma20_price) / ma20_price
+            
+            if price_diff <= threshold:
+                stocks_to_buy.append((stock_code, current_price, price_diff))
+                
+            stocks_to_buy.sort(key=lambda x: x[2])
+            self.execute_limited_buy_orders(stocks_to_buy[:4])
+            
+    def execute_limited_buy_orders(self, stocks):
+        """1초당 4개씩 매수 주문 실행"""
+        if not stocks:
+            return
 
-            # 매수 조건 확인 (절대값 차이가 threshold % 이내)
-            if abs((current_price - ma20_price) / ma20_price) <= threshold:
-                order_id = self.place_buy_order(stock_code, current_price, buy_amount)
+        stock_code, price, _ = stocks.pop(0)  # 첫 번째 종목 꺼내기
+        buy_amount = int(self.ui.buy_amount_input.text())
+        order_id = self.place_buy_order(stock_code, price, buy_amount)
 
-                if order_id == 0:
-                    self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
-                    print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
-                    break  # 한 번에 하나의 종목만 주문하도록 제한
+        if order_id == 0:
+            print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
+            self.pending_orders[stock_code] = order_id
+
+        # ✅ 1초 후 다음 주문 실행 (최대 4개)
+        if stocks:
+            QTimer.singleShot(1000, lambda: self.execute_limited_buy_orders(stocks))
+            
 
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
