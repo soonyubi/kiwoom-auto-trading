@@ -45,16 +45,16 @@ class AutoTrader:
         buy_amount = int(self.ui.buy_amount_input.text())
 
         # 잔고 확인
-        if not self.ui.current_balance:
+        if not self.ui.account_manager.current_balance:
             print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
             self.ui.account_manager.request_account_balance()
             return
 
-        if self.ui.current_balance < buy_amount:
-            print(f"❌ 잔고 부족: {self.ui.current_balance}원, 필요한 금액: {buy_amount}원")
+        if self.ui.account_manager.current_balance < buy_amount:
+            print(f"❌ 잔고 부족: {self.ui.account_manager.current_balance}원, 필요한 금액: {buy_amount}원")
             return
 
-        for stock in self.ui.candidates_stocks:
+        for stock in self.ui.stock_data_manager.candidates_stocks:
             stock_code = stock["stock_code"]
 
             # 이미 주문한 종목은 건너뛰기
@@ -62,6 +62,7 @@ class AutoTrader:
                 continue
 
             current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            
 
             if not current_price:
                 continue
@@ -109,6 +110,7 @@ class AccountManager:
         self.kiwoom = kiwoom  # 키움 API 객체
         self.ui = ui  # UI 객체 참조
         self.current_balance = None  # 현재 잔고
+        self.owned_stocks = set()
         
     
     def get_holdings_from_tr(self, trcode, rqname):
@@ -118,13 +120,17 @@ class AccountManager:
             print(f"📥 보유 종목 조회 응답 수신: {stock_count}개 종목")
 
             holdings = []
+            self.owned_stocks.clear()
+
             for i in range(stock_count):
+                stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목코드").strip()
                 stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
                 quantity = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량").strip()
                 buy_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가").strip()
 
-                holdings.append({"stock_name": stock_name, "quantity": quantity, "buy_price": buy_price})
+                holdings.append({"stock_name": stock_name, "quantity": quantity, "buy_price": buy_price, "stock_code": stock_code})
 
+                self.owned_stocks.add(stock_code)
             return holdings  # 데이터 반환
         except Exception as e:
             print(f"❌ 보유 종목 조회 중 오류 발생: {e}")
@@ -248,7 +254,6 @@ class StockDataManager:
         filter_candidates()
         self.load_candidates_list()
         
-from PyQt5.QtCore import QTimer, QColor, QTableWidgetItem
 
 class RealtimeDataManager:
     """실시간 데이터 업데이트 관리"""
@@ -520,7 +525,7 @@ class KiwoomUI(QMainWindow):
         print(f"📩 TR 데이터 수신: {rqname} (TR 코드: {trcode})")
         if rqname == "보유종목조회":
             holdings = self.account_manager.get_holdings_from_tr(trcode, rqname)  # ✅ AccountManager에서 데이터 가져옴
-
+            
             if holdings:
                 stock_info = "\n".join([f"종목명: {h['stock_name']}, 수량: {h['quantity']}, 매입가: {h['buy_price']}" for h in holdings])
             else:
