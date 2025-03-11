@@ -32,6 +32,7 @@ class KiwoomUI(QMainWindow):
         self.auto_buy_amount = 100000
         self.auto_buy_threshold = 0.8 / 100
         self.pending_orders = {}
+        self.current_balance = None
 
         # 탭 위젯 추가
         self.tabs = QTabWidget(self)
@@ -128,6 +129,16 @@ class KiwoomUI(QMainWindow):
         threshold = float(self.threshold_input.text()) / 100
         buy_amount = int(self.buy_amount_input.text())
 
+        # ✅ 잔고 확인 (최신 잔고가 없는 경우 조회)
+        if not hasattr(self, 'current_balance') or self.current_balance is None:
+            print("🔄 잔고 정보가 없습니다. 잔고 조회 후 매수 실행")
+            self.request_account_balance()
+            return
+
+        if self.current_balance < buy_amount:
+            print(f"❌ 잔고 부족: {self.current_balance}원, 필요한 금액: {buy_amount}원")
+            return
+
         for stock in self.candidates_stocks:
             stock_code = stock["stock_code"]
 
@@ -147,29 +158,34 @@ class KiwoomUI(QMainWindow):
             if abs((current_price - ma20_price) / ma20_price) <= threshold:
                 order_id = self.place_buy_order(stock_code, current_price, buy_amount)
 
-                if order_id:
+                if order_id==0:
                     self.pending_orders[stock_code] = order_id  # ✅ 주문한 종목을 pending_orders에 저장
                     print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
                     break  # 한 번에 하나의 종목만 주문하도록 제한
             
+    
     def place_buy_order(self, stock_code, price, amount):
         """키움 OpenAPI를 통해 매수 주문 실행"""
         account_number = self.account_combo.currentText()
         quantity = amount // price  # 구매 가능한 수량 계산
 
         if quantity < 1:
-            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가")
-            return
+            print(f"❌ {stock_code}: 잔액 부족으로 매수 불가 (수량: {quantity})")
+            return None
 
-        print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가)")
+        print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가) 총 매수 금액 : {price * quantity:,} 원")
 
-        order_id = self.kiwoom.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
-            ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""])
-        
-                
-        if order_id==0:
-            self.pending_orders[stock_code] = order_id  # 주문 중인 종목 추가
+        order_id = self.kiwoom.dynamicCall(
+            "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+            ["자동매수", "0101", account_number, 1, stock_code, quantity, 0, "03", ""]
+        )
+
+        if order_id == 0:
+            print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
+            self.pending_orders[stock_code] = order_id
             QTimer.singleShot(2000, self.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
+        else:
+            print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
 
         return order_id
     
@@ -269,15 +285,20 @@ class KiwoomUI(QMainWindow):
         """현재 보유 종목을 가져와서 owned_stocks에 저장"""
         account_number = self.account_combo.currentText()
         if not account_number:
+            print("❌ 계좌번호를 선택하세요.")
             return
 
-        self.owned_stocks.clear()
+        print(f"🔍 보유 종목 조회 요청 보냄... (계좌번호: {account_number})")
 
-        stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", "OPW00018", "보유종목조회")
-        print("보유 종목 조회 실행 : stock_count", stock_count)
-        for i in range(stock_count):
-            stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", "OPW00018", "보유종목조회", i, "종목코드").strip()
-            self.owned_stocks.add(stock_code)
+        # TR 요청을 보내야 `on_receive_tr_data`가 호출됨
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "조회구분", "1")  # 1: 보유 종목 조회
+
+        # ✅ TR 요청 실행 → on_receive_tr_data()가 호출되도록 설정
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목조회", "OPW00018", 0, "4000")
+
 
     def setup_buy_tab_ui(self):
         """매수 후보군 UI 설정"""
@@ -452,9 +473,10 @@ class KiwoomUI(QMainWindow):
 
     def on_receive_tr_data(self, screen_no, rqname, trcode, recordname, prev_next, data_len, err_code, msg1, msg2):
         """TR 데이터 수신 이벤트"""
-        
+        print(f"📩 TR 데이터 수신: {rqname} (TR 코드: {trcode})")
         if rqname == "보유종목조회":
             stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+            print(f"📥 보유 종목 조회 응답 수신: {stock_count}개 종목")
             stock_info = ""
 
             for i in range(stock_count):
@@ -475,6 +497,7 @@ class KiwoomUI(QMainWindow):
                 try:
                     balance = int(balance_raw.replace(",", ""))  # 쉼표 제거 후 정수 변환
                     self.balance_label.setText(f"계좌 잔액: {balance:,}원")
+                    self.current_balance = balance
                     print(f"✅ 계좌 잔액 업데이트: {balance:,}원")
                 except ValueError:
                     print(f"❌ 잔고 데이터 변환 실패: {balance_raw}")
