@@ -146,6 +146,6 @@ if __name__ == "__main__":
 
     for stock_code in stock_list: 
         kiwoom.get_stock_data(stock_code)
-        time.sleep(1)
+        time.sleep(0.3)
 
     filter_candidates()
