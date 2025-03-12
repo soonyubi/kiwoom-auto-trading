@@ -679,8 +679,8 @@ class KiwoomUI(QMainWindow):
             self.account_manager.on_receive_tr_data(rqname, trcode)
             
         if rqname == "현재가조회":  # ✅ opt10001 응답 처리
-            stock_code = self.ui.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "종목코드").strip()
-            current_price = self.ui.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "현재가").strip()
+            stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "종목코드").strip()
+            current_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "현재가").strip()
 
             if current_price and current_price != "":
                 current_price = int(current_price.replace(",", ""))
@@ -691,7 +691,7 @@ class KiwoomUI(QMainWindow):
             print(f"📥 {stock_code} 현재가 수신: {current_price}")
 
             # ✅ candidates_stocks에서 종목 찾기 & 업데이트
-            for stock in self.ui.stock_data_manager.candidates_stocks:
+            for stock in self.stock_data_manager.candidates_stocks:
                 if stock["stock_code"] == stock_code:
                     stock["current_price"] = current_price  # ✅ 현재가 업데이트
 
@@ -701,10 +701,10 @@ class KiwoomUI(QMainWindow):
                     diff_percent = (diff_amount / ma20_price) * 100 if ma20_price > 0 else 0
 
                     # ✅ UI 테이블 업데이트
-                    for row in range(self.ui.candidates_table.rowCount()):
-                        if self.ui.candidates_table.item(row, 0).text() == stock_code:
-                            self.ui.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))  # 현재가
-                            self.ui.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))  # 차이 금액
+                    for row in range(self.candidates_table.rowCount()):
+                        if self.candidates_table.item(row, 0).text() == stock_code:
+                            self.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))  # 현재가
+                            self.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))  # 차이 금액
 
                             diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
                             if diff_percent > 0:
@@ -712,7 +712,7 @@ class KiwoomUI(QMainWindow):
                             elif diff_percent < 0:
                                 diff_item.setBackground(QColor(200, 200, 255))  # 파란색 계열
 
-                            self.ui.candidates_table.setItem(row, 4, diff_item)
+                            self.candidates_table.setItem(row, 4, diff_item)
                             break  # ✅ 찾으면 종료
 
             # ✅ Qt UI 강제 갱신
