@@ -369,8 +369,8 @@ class RealtimeDataManager:
         self.request_holdings_prices()
 
         # ✅ 일정 주기마다 반복 요청 실행
-        self.stock_timer.start(10000)  # 10초마다 후보군 현재가 업데이트
-        self.holdings_timer.start(10000)  # 10초마다 보유 종목 현재가 업데이트
+        self.stock_timer.start(300000)  # 5분마다 후보군 현재가 업데이트
+        self.holdings_timer.start(300000)  # 5분마다 보유 종목 현재가 업데이트
 
     def stop_realtime_updates(self):
         """실시간 데이터 업데이트 중지"""
