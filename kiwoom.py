@@ -677,7 +677,8 @@ class KiwoomUI(QMainWindow):
 
             # ✅ 데이터 정리
             stock_code = stock_code.replace("A", "").strip()  # "A" 접두사 제거
-            current_price = int(current_price.replace(",", ""))
+            current_price = abs(int(current_price.replace(",", "")))
+            
 
             print(f"📥 {stock_code} 현재가 수신: {current_price}")
 
