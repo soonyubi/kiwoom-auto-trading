@@ -342,40 +342,61 @@ class RealtimeDataManager:
     def __init__(self, kiwoom, ui):
         self.kiwoom = kiwoom
         self.ui = ui
-        self.current_request_index = 0  # ✅ 현재 요청 중인 종목 인덱스
+
+        self.stock_request_index = 0  # ✅ 후보군 리스트 요청 인덱스
+        self.holdings_request_index = 0  # ✅ 보유 종목 요청 인덱스
         self.stock_request_queue = []  # ✅ 후보군 종목 요청 대기열
         self.holdings_request_queue = []  # ✅ 보유 종목 요청 대기열
 
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.request_stock_prices)
+        self.stock_timer = QTimer()
+        self.stock_timer.timeout.connect(self.request_stock_prices)
 
         self.holdings_timer = QTimer()
         self.holdings_timer.timeout.connect(self.request_holdings_prices)
 
     def start_realtime_updates(self):
         """실시간 데이터 업데이트 시작"""
-        self.stock_request_queue = [stock["stock_code"] for stock in self.ui.stock_data_manager.candidates_stocks]
-        self.holdings_request_queue = list(self.ui.account_manager.owned_stocks)
+        print("📡 실시간 주가 업데이트 시작")
 
-        self.current_request_index = 0
-        self.request_stock_prices()  # ✅ 후보군 리스트 업데이트 시작
-        self.request_holdings_prices()  # ✅ 보유 종목 업데이트 시작
+        self.stock_request_index = 0
+        self.holdings_request_index = 0
+
+        # ✅ 후보군 & 보유 종목 큐 초기화
+        self.update_request_queues()
+
+        # ✅ 처음 요청 시작
+        self.request_stock_prices()
+        self.request_holdings_prices()
+
+        # ✅ 일정 주기마다 반복 요청 실행
+        self.stock_timer.start(10000)  # 10초마다 후보군 현재가 업데이트
+        self.holdings_timer.start(10000)  # 10초마다 보유 종목 현재가 업데이트
 
     def stop_realtime_updates(self):
         """실시간 데이터 업데이트 중지"""
-        self.timer.stop()
+        self.stock_timer.stop()
         self.holdings_timer.stop()
         print("🛑 실시간 주가 업데이트 중지")
+
+    def update_request_queues(self):
+        """후보군 & 보유 종목 요청 대기열을 갱신"""
+        self.stock_request_queue = [stock["stock_code"] for stock in self.ui.stock_data_manager.candidates_stocks]
+        self.holdings_request_queue = list(self.ui.account_manager.owned_stocks)
 
     # ✅ 후보군 리스트의 종목들 현재가 요청
     def request_stock_prices(self):
         """후보군 종목별 현재가를 opt10001로 요청"""
-        if self.current_request_index >= len(self.stock_request_queue):
+        if not self.stock_request_queue:
+            print("⚠️ 후보군 리스트가 비어 있습니다.")
+            return
+        
+        if self.stock_request_index >= len(self.stock_request_queue):
             print("✅ 후보군 리스트 현재가 업데이트 완료")
+            self.stock_request_index = 0  # ✅ 다시 처음부터 요청하도록 설정
             return
 
-        stock_code = self.stock_request_queue[self.current_request_index]
-        self.current_request_index += 1
+        stock_code = self.stock_request_queue[self.stock_request_index]
+        self.stock_request_index += 1
 
         print(f"📡 현재가 요청: {stock_code} (후보군 리스트)")
 
@@ -388,12 +409,17 @@ class RealtimeDataManager:
     # ✅ 보유 종목의 현재가 요청
     def request_holdings_prices(self):
         """보유 종목별 현재가를 opt10001로 요청"""
-        if self.current_request_index >= len(self.holdings_request_queue):
-            print("✅ 보유 종목 현재가 업데이트 완료")
+        if not self.holdings_request_queue:
+            print("⚠️ 보유 종목 리스트가 비어 있습니다.")
             return
 
-        stock_code = self.holdings_request_queue[self.current_request_index]
-        self.current_request_index += 1
+        if self.holdings_request_index >= len(self.holdings_request_queue):
+            print("✅ 보유 종목 현재가 업데이트 완료")
+            self.holdings_request_index = 0  # ✅ 다시 처음부터 요청하도록 설정
+            return
+
+        stock_code = self.holdings_request_queue[self.holdings_request_index]
+        self.holdings_request_index += 1
 
         print(f"📡 현재가 요청: {stock_code} (보유 종목)")
 
