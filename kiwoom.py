@@ -362,53 +362,22 @@ class RealtimeDataManager:
         print("🛑 실시간 주가 업데이트 중지")
 
     def update_stock_prices(self):
-        """후보군 리스트의 현재가를 업데이트하고 UI를 새로 그림"""
-        print("🔄 후보군 리스트 현재가 업데이트 시작...")
+        """주기적으로 종목별 현재가를 opt10001로 조회 요청"""
+        print("🔄 후보군 리스트 현재가 업데이트 요청 시작...")
 
-        for row, stock in enumerate(self.ui.stock_data_manager.candidates_stocks):
+        self.current_price_requests = []  # ✅ 요청한 종목 목록 저장
+
+        for stock in self.ui.stock_data_manager.candidates_stocks:
             stock_code = stock["stock_code"]
 
-            # ✅ 현재가 가져오기 (에러 방지)
-            try:
-                current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
-                if not current_price or current_price == "":
-                    print(f"⚠️ {stock_code}: 현재가 가져오기 실패")
-                    continue
-                current_price = int(current_price.replace(",", ""))
-            except Exception as e:
-                print(f"❌ {stock_code}: 현재가 가져오는 중 오류 발생 - {e}")
-                continue
+            # ✅ opt10001 TR 요청 (현재가 조회)
+            self.ui.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
+            self.ui.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "현재가조회", "opt10001", 0, "5000")
 
-            # ✅ 후보군 리스트 데이터 업데이트
-            stock["current_price"] = current_price
+            # ✅ 요청한 종목 저장 (응답 시 활용)
+            self.current_price_requests.append(stock_code)
 
-            # 20이평 가격 가져오기
-            ma20_price = stock["price"]
-
-            # 차이 계산
-            diff_amount = current_price - ma20_price
-            diff_percent = (diff_amount / ma20_price) * 100 if ma20_price > 0 else 0
-
-            # ✅ UI 업데이트
-            self.ui.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))  # 현재가
-            self.ui.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))  # 차이 금액
-
-            diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
-
-            # ✅ 차이(%) 색상 설정 (양수 = 빨강, 음수 = 파랑)
-            if diff_percent > 0:
-                red_intensity = min(255, int(255 * (diff_percent / 10)))  # 최대 10% 기준
-                diff_item.setBackground(QColor(255, 255 - red_intensity, 255 - red_intensity))  # 빨간색 계열
-            elif diff_percent < 0:
-                blue_intensity = min(255, int(255 * (-diff_percent / 10)))  # 최대 -10% 기준
-                diff_item.setBackground(QColor(255 - blue_intensity, 255 - blue_intensity, 255))  # 파란색 계열
-
-            self.ui.candidates_table.setItem(row, 4, diff_item)
-
-        # ✅ Qt 이벤트 루프 강제 실행 (UI 갱신)
-        QApplication.processEvents()
-        
-        print("✅ 후보군 리스트 현재가 업데이트 완료")
+        print(f"✅ {len(self.current_price_requests)}개 종목에 대해 현재가 조회 요청 완료")
     
     def update_holdings_prices(self):
         """보유 종목의 현재가를 주기적으로 업데이트"""
@@ -708,6 +677,46 @@ class KiwoomUI(QMainWindow):
         
         if rqname == "잔고조회":
             self.account_manager.on_receive_tr_data(rqname, trcode)
+            
+        if rqname == "현재가조회":  # ✅ opt10001 응답 처리
+            stock_code = self.ui.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "종목코드").strip()
+            current_price = self.ui.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "현재가").strip()
+
+            if current_price and current_price != "":
+                current_price = int(current_price.replace(",", ""))
+            else:
+                print(f"⚠️ {stock_code}: 현재가 데이터 없음")
+                return
+
+            print(f"📥 {stock_code} 현재가 수신: {current_price}")
+
+            # ✅ candidates_stocks에서 종목 찾기 & 업데이트
+            for stock in self.ui.stock_data_manager.candidates_stocks:
+                if stock["stock_code"] == stock_code:
+                    stock["current_price"] = current_price  # ✅ 현재가 업데이트
+
+                    # 20이평 가격 가져오기
+                    ma20_price = stock["price"]
+                    diff_amount = current_price - ma20_price
+                    diff_percent = (diff_amount / ma20_price) * 100 if ma20_price > 0 else 0
+
+                    # ✅ UI 테이블 업데이트
+                    for row in range(self.ui.candidates_table.rowCount()):
+                        if self.ui.candidates_table.item(row, 0).text() == stock_code:
+                            self.ui.candidates_table.setItem(row, 1, QTableWidgetItem(str(current_price)))  # 현재가
+                            self.ui.candidates_table.setItem(row, 3, QTableWidgetItem(str(diff_amount)))  # 차이 금액
+
+                            diff_item = QTableWidgetItem(f"{diff_percent:.2f}%")
+                            if diff_percent > 0:
+                                diff_item.setBackground(QColor(255, 200, 200))  # 빨간색 계열
+                            elif diff_percent < 0:
+                                diff_item.setBackground(QColor(200, 200, 255))  # 파란색 계열
+
+                            self.ui.candidates_table.setItem(row, 4, diff_item)
+                            break  # ✅ 찾으면 종료
+
+            # ✅ Qt UI 강제 갱신
+            QApplication.processEvents()
         
       
             
