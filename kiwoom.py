@@ -342,18 +342,24 @@ class RealtimeDataManager:
     def __init__(self, kiwoom, ui):
         self.kiwoom = kiwoom
         self.ui = ui
+        self.current_request_index = 0  # ✅ 현재 요청 중인 종목 인덱스
+        self.stock_request_queue = []  # ✅ 후보군 종목 요청 대기열
+        self.holdings_request_queue = []  # ✅ 보유 종목 요청 대기열
+
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_stock_prices)
-        
+        self.timer.timeout.connect(self.request_stock_prices)
+
         self.holdings_timer = QTimer()
-        self.holdings_timer.timeout.connect(self.update_holdings_prices)
-    
+        self.holdings_timer.timeout.connect(self.request_holdings_prices)
+
     def start_realtime_updates(self):
         """실시간 데이터 업데이트 시작"""
-        self.timer.start(5000)  # 5초마다 후보군 종목 가격 업데이트
-        self.holdings_timer.start(5000)  # ✅ 보유 종목 가격 업데이트 5초마다 실행
-        print("📡 실시간 주가 업데이트 시작")
-        self.update_stock_prices()
+        self.stock_request_queue = [stock["stock_code"] for stock in self.ui.stock_data_manager.candidates_stocks]
+        self.holdings_request_queue = list(self.ui.account_manager.owned_stocks)
+
+        self.current_request_index = 0
+        self.request_stock_prices()  # ✅ 후보군 리스트 업데이트 시작
+        self.request_holdings_prices()  # ✅ 보유 종목 업데이트 시작
 
     def stop_realtime_updates(self):
         """실시간 데이터 업데이트 중지"""
@@ -361,50 +367,42 @@ class RealtimeDataManager:
         self.holdings_timer.stop()
         print("🛑 실시간 주가 업데이트 중지")
 
-    def update_stock_prices(self):
-        """주기적으로 종목별 현재가를 opt10001로 조회 요청"""
-        print("🔄 후보군 리스트 현재가 업데이트 요청 시작...")
+    # ✅ 후보군 리스트의 종목들 현재가 요청
+    def request_stock_prices(self):
+        """후보군 종목별 현재가를 opt10001로 요청"""
+        if self.current_request_index >= len(self.stock_request_queue):
+            print("✅ 후보군 리스트 현재가 업데이트 완료")
+            return
 
-        self.current_price_requests = []  # ✅ 요청한 종목 목록 저장
+        stock_code = self.stock_request_queue[self.current_request_index]
+        self.current_request_index += 1
 
-        for stock in self.ui.stock_data_manager.candidates_stocks:
-            stock_code = stock["stock_code"]
+        print(f"📡 현재가 요청: {stock_code} (후보군 리스트)")
 
-            # ✅ opt10001 TR 요청 (현재가 조회)
-            self.ui.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
-            self.ui.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "현재가조회", "opt10001", 0, "5000")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "현재가조회", "opt10001", 0, "5000")
 
-            # ✅ 요청한 종목 저장 (응답 시 활용)
-            self.current_price_requests.append(stock_code)
+        # ✅ 500ms 후에 다음 종목 요청
+        QTimer.singleShot(500, self.request_stock_prices)
 
-        print(f"✅ {len(self.current_price_requests)}개 종목에 대해 현재가 조회 요청 완료")
+    # ✅ 보유 종목의 현재가 요청
+    def request_holdings_prices(self):
+        """보유 종목별 현재가를 opt10001로 요청"""
+        if self.current_request_index >= len(self.holdings_request_queue):
+            print("✅ 보유 종목 현재가 업데이트 완료")
+            return
+
+        stock_code = self.holdings_request_queue[self.current_request_index]
+        self.current_request_index += 1
+
+        print(f"📡 현재가 요청: {stock_code} (보유 종목)")
+
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "종목코드", stock_code)
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "보유종목현재가조회", "opt10001", 0, "6000")
+
+        # ✅ 500ms 후에 다음 종목 요청
+        QTimer.singleShot(500, self.request_holdings_prices)
     
-    def update_holdings_prices(self):
-        """보유 종목의 현재가를 주기적으로 업데이트"""
-        for row in range(self.ui.holdings_table.rowCount()):
-            stock_code = self.ui.account_manager.owned_stocks[row]["stock_code"]
-
-            # ✅ 현재가 조회
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
-            if not current_price:
-                continue
-            current_price = int(current_price.replace(",", ""))
-
-            buy_price = int(self.ui.holdings_table.item(row, 2).text())  # 매입 평단가
-            price_diff = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
-
-            # ✅ UI 업데이트
-            self.ui.holdings_table.setItem(row, 1, QTableWidgetItem(str(current_price)))
-            diff_item = QTableWidgetItem(f"{price_diff:.2f}%")
-
-            if price_diff > 0:
-                diff_item.setBackground(QColor(255, 200, 200))  # 빨간색 계열
-            elif price_diff < 0:
-                diff_item.setBackground(QColor(200, 200, 255))  # 파란색 계열
-
-            self.ui.holdings_table.setItem(row, 3, diff_item)
-
-        print("✅ 보유 종목 현재가 업데이트 완료")
 
 class KiwoomUI(QMainWindow):
     RQNAME_DAILY_CHART = "주식일봉차트조회"
@@ -439,18 +437,6 @@ class KiwoomUI(QMainWindow):
         
 
         self.setup_ui()
-
-        # ✅ 실시간 업데이트 시작
-        self.realtime_data_manager.start_realtime_updates()
-
-        # 실시간 업데이트 타이머 설정 (5초마다 실행)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.realtime_data_manager.update_stock_prices)
-        self.timer.start(5000)
-        
-
-        # ✅ 후보군 데이터 갱신
-        self.stock_data_manager.refresh_candidate_stocks()
         
     def setup_ui(self):
         """전체 UI 초기화"""
@@ -658,6 +644,8 @@ class KiwoomUI(QMainWindow):
             self.login_button.setEnabled(False)
             self.logout_button.setEnabled(True)
             self.account_manager.get_account_info()
+            self.stock_data_manager.refresh_candidate_stocks()
+            self.realtime_data_manager.start_realtime_updates()
         else:
             self.status_label.setText(f"로그인 상태: 실패 (에러코드 {err_code})")
 
@@ -682,20 +670,23 @@ class KiwoomUI(QMainWindow):
             stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "종목코드").strip()
             current_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "현재가").strip()
 
-            if current_price and current_price != "":
-                current_price = int(current_price.replace(",", ""))
-            else:
-                print(f"⚠️ {stock_code}: 현재가 데이터 없음")
-                return
+            # ✅ 데이터가 정상적으로 들어왔는지 확인
+            if not stock_code or not current_price:
+                print(f"⚠️ 현재가 데이터 없음, stock_code={stock_code}, current_price={current_price}")
+                return  # ✅ 잘못된 응답은 무시
+
+            # ✅ 데이터 정리
+            stock_code = stock_code.replace("A", "").strip()  # "A" 접두사 제거
+            current_price = int(current_price.replace(",", ""))
 
             print(f"📥 {stock_code} 현재가 수신: {current_price}")
 
-            # ✅ candidates_stocks에서 종목 찾기 & 업데이트
+            # ✅ 후보군 리스트에서 해당 종목 찾기
             for stock in self.stock_data_manager.candidates_stocks:
                 if stock["stock_code"] == stock_code:
                     stock["current_price"] = current_price  # ✅ 현재가 업데이트
 
-                    # 20이평 가격 가져오기
+                    # ✅ 20이평 가격 가져오기
                     ma20_price = stock["price"]
                     diff_amount = current_price - ma20_price
                     diff_percent = (diff_amount / ma20_price) * 100 if ma20_price > 0 else 0
