@@ -232,6 +232,22 @@ class AccountManager:
 
         self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "잔고조회", "OPW00001", 0, "2000")
         print(f"🔄 잔고 조회 요청 보냄... account number: {account_number}")
+        
+    def request_opw00004(self):
+        """OPW00004 요청"""
+        account_number = self.ui.account_combo.currentText()
+        print(f"🔄 OPW00004 요청 보냄... account number: {account_number}")
+        if not account_number:
+            print("❌ 계좌번호를 선택하세요.")
+            return
+        
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_number)
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "상장폐지조회구분", "0")
+        self.kiwoom.dynamicCall("SetInputValue(QString, QString)", "거래소구분", "KRX") 
+        
+        self.kiwoom.dynamicCall("CommRqData(QString, QString, int, QString)", "계좌평가현황요청", "OPW00004", 0, "6001")
 
     def on_receive_tr_data(self, rqname, trcode):
         """TR 데이터 수신 이벤트 처리 (잔고 조회)"""
@@ -252,6 +268,37 @@ class AccountManager:
             else:
                 print("❌ 계좌 잔액 조회 실패 (데이터 없음)")
                 self.ui.balance_label.setText("계좌 잔액: 조회 실패")
+                
+        if rqname == "계좌평가현황요청":
+            print(f"📥 계좌평가현황요청 응답 수신: {trcode}")
+            
+            cash = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+            d2_deposit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "D+2추정예수금").strip()
+            total_buy_amount = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "총매입금액").strip()
+        
+            today_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당일투자손익").strip()
+            monthly_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당월투자손익").strip()
+            accumulated_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "누적투자손익").strip()
+            
+            today_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당일손익율").strip()
+            monthly_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당월손익율").strip()
+            accumulated_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "누적손익율").strip()
+            
+            stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+            
+            for i in range(stock_count):
+                stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목코드").strip()
+                stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
+                quantity = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량").strip()
+                buy_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가").strip()
+                current_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()
+                evaluation_amount = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "평가금액").strip()
+                profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익금액").strip()
+                profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익율").strip()
+                
+                
+                
+                
 
 class StockDataManager:
     """종목 데이터 로딩 및 관리"""
@@ -490,12 +537,41 @@ class KiwoomUI(QMainWindow):
         """체결 리스트 UI 설정"""
         layout = QVBoxLayout()
 
+        # ✅ 조회 버튼 추가
+        self.fetch_holdings_button = QPushButton("조회")
+        self.fetch_holdings_button.clicked.connect(self.account_manager.request_opw00004)
+        layout.addWidget(self.fetch_holdings_button)
+
         # ✅ 보유 종목 리스트 테이블 생성
         self.holdings_table = QTableWidget()
-        self.holdings_table.setColumnCount(4)  # 종목명, 현재가, 매입평단가, 차이(%)
-        self.holdings_table.setHorizontalHeaderLabels(["종목명", "현재가", "매입평단가", "차이(%)"])
+        self.holdings_table.setColumnCount(8)  # 종목코드, 종목명, 보유수량, 평균단가, 현재가, 평가금액, 손익금액, 손익률
+        self.holdings_table.setHorizontalHeaderLabels(["종목코드", "종목명", "보유수량", "평균단가", "현재가", "평가금액", "손익금액", "손익률"])
         layout.addWidget(self.holdings_table)
 
+        # ✅ 계좌 정보 패널
+        account_info_layout = QVBoxLayout()
+
+        self.cash_label = QLabel("예수금: -")
+        self.d2_deposit_label = QLabel("D+2 추정 예수금: -")
+        self.total_buy_amount_label = QLabel("총 매입 금액: -")
+        self.today_profit_label = QLabel("당일 손익: -")
+        self.monthly_profit_label = QLabel("당월 손익: -")
+        self.accumulated_profit_label = QLabel("누적 손익: -")
+        self.today_profit_rate_label = QLabel("당일 손익률: -")
+        self.monthly_profit_rate_label = QLabel("당월 손익률: -")
+        self.accumulated_profit_rate_label = QLabel("누적 손익률: -")
+
+        account_info_layout.addWidget(self.cash_label)
+        account_info_layout.addWidget(self.d2_deposit_label)
+        account_info_layout.addWidget(self.total_buy_amount_label)
+        account_info_layout.addWidget(self.today_profit_label)
+        account_info_layout.addWidget(self.monthly_profit_label)
+        account_info_layout.addWidget(self.accumulated_profit_label)
+        account_info_layout.addWidget(self.today_profit_rate_label)
+        account_info_layout.addWidget(self.monthly_profit_rate_label)
+        account_info_layout.addWidget(self.accumulated_profit_rate_label)
+
+        layout.addLayout(account_info_layout)
         self.holdings_tab.setLayout(layout)
 
         
@@ -735,6 +811,56 @@ class KiwoomUI(QMainWindow):
 
             # ✅ Qt UI 강제 갱신
             QApplication.processEvents()
+            
+        if rqname == "계좌평가현황요청":
+            print(f"📥 계좌평가현황요청 응답 수신: {trcode}")
+
+            # ✅ 계좌 정보 가져오기
+            cash = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+            d2_deposit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "D+2추정예수금").strip()
+            total_buy_amount = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "총매입금액").strip()
+            today_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당일투자손익").strip()
+            monthly_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당월투자손익").strip()
+            accumulated_profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "누적투자손익").strip()
+            today_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당일손익율").strip()
+            monthly_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "당월손익율").strip()
+            accumulated_profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "누적손익율").strip()
+
+            # ✅ UI 업데이트
+            self.cash_label.setText(f"예수금: {cash:,}원")
+            self.d2_deposit_label.setText(f"D+2 추정 예수금: {d2_deposit:,}원")
+            self.total_buy_amount_label.setText(f"총 매입 금액: {total_buy_amount:,}원")
+            self.today_profit_label.setText(f"당일 손익: {today_profit:,}원")
+            self.monthly_profit_label.setText(f"당월 손익: {monthly_profit:,}원")
+            self.accumulated_profit_label.setText(f"누적 손익: {accumulated_profit:,}원")
+            self.today_profit_rate_label.setText(f"당일 손익률: {today_profit_rate}%")
+            self.monthly_profit_rate_label.setText(f"당월 손익률: {monthly_profit_rate}%")
+            self.accumulated_profit_rate_label.setText(f"누적 손익률: {accumulated_profit_rate}%")
+
+            # ✅ 보유 종목 정보 가져오기
+            stock_count = self.kiwoom.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+            self.holdings_table.setRowCount(stock_count)
+
+            for i in range(stock_count):
+                stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목코드").strip()
+                stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
+                quantity = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량").strip()
+                buy_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가").strip()
+                current_price = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()
+                evaluation_amount = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "평가금액").strip()
+                profit = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익금액").strip()
+                profit_rate = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익율").strip()
+
+                self.holdings_table.setItem(i, 0, QTableWidgetItem(stock_code))
+                self.holdings_table.setItem(i, 1, QTableWidgetItem(stock_name))
+                self.holdings_table.setItem(i, 2, QTableWidgetItem(quantity))
+                self.holdings_table.setItem(i, 3, QTableWidgetItem(buy_price))
+                self.holdings_table.setItem(i, 4, QTableWidgetItem(current_price))
+                self.holdings_table.setItem(i, 5, QTableWidgetItem(evaluation_amount))
+                self.holdings_table.setItem(i, 6, QTableWidgetItem(profit))
+                self.holdings_table.setItem(i, 7, QTableWidgetItem(profit_rate))
+
+            print(f"✅ {stock_count}개의 보유 종목 정보 업데이트 완료")
         
       
             
