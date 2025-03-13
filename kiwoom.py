@@ -252,7 +252,7 @@ class AccountManager:
     def on_receive_tr_data(self, rqname, trcode):
         """TR 데이터 수신 이벤트 처리 (잔고 조회)"""
         if rqname == "잔고조회":
-            balance_raw = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금").strip()
+            balance_raw = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "주문가능금액").strip()
 
             print(f"📥 잔고 조회 응답 수신: {balance_raw}")  # ✅ 응답 로그 추가
 
