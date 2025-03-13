@@ -818,7 +818,15 @@ class KiwoomUI(QMainWindow):
             # ✅ 계좌 정보 가져오기
             def clean_number(value):
                 """문자열로 된 숫자를 정리 (앞 0 제거, 쉼표 추가)"""
-                return f"{int(value):,}" if value.strip().isdigit() else value.strip()
+                stripped_vaule = value.strip()
+                if not stripped_vaule:
+                    return "0"
+                
+                try:
+                    return f"{int(stripped_vaule):,}"
+                except ValueError:
+                    return value
+                
 
             cash = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "예수금"))
             d2_deposit = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "D+2추정예수금"))
@@ -861,13 +869,11 @@ class KiwoomUI(QMainWindow):
                 stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목코드").strip()
                 stock_name = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "종목명").strip()
                 quantity = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "보유수량"))
-                buy_price = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입가"))
+                buy_price = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "매입금액"))
                 current_price = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가"))
                 evaluation_amount = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "평가금액"))
                 profit = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익금액"))
                 profit_rate = clean_number(self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "손익율").strip())
-                
-                print(f"📥 보유 종목 정보: {stock_code}, {stock_name}, {quantity}, {buy_price}, {current_price}, {evaluation_amount}, {profit}, {profit_rate}")
 
                 self.holdings_table.setItem(i, 0, QTableWidgetItem(stock_code))
                 self.holdings_table.setItem(i, 1, QTableWidgetItem(stock_name))
