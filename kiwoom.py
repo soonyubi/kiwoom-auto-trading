@@ -126,7 +126,7 @@ class AutoTrader:
         if order_id == 0:
             print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
             self.pending_orders[stock_code] = order_id
-            QTimer.singleShot(2000, self.ui.account_manager.request_account_balance)  # ✅ 주문 후 잔고 조회 요청 (2초 후 실행)
+            self.ui.account_manager.request_account_balance
         else:
             print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
 
@@ -767,6 +767,7 @@ class KiwoomUI(QMainWindow):
         
         if rqname == "잔고조회":
             self.account_manager.on_receive_tr_data(rqname, trcode)
+            QApplication.processEvents()
             
         if rqname == "현재가조회":  # ✅ opt10001 응답 처리
             stock_code = self.kiwoom.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, 0, "종목코드").strip()
