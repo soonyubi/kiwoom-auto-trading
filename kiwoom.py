@@ -95,6 +95,17 @@ class AutoTrader:
             print("🛑 더 이상 주문할 종목이 없습니다. 자동매수 종료")
             self.stop_auto_trade()
             return
+        
+        current_balance = self.ui.account_manager.current_balance
+        buy_amount = int(self.ui.buy_amount_input.text())
+
+        print(f"🔍 현재 잔고: {current_balance:,}원")
+
+        # ✅ 잔고 부족 시 주문 실행하지 않음
+        if current_balance is None or current_balance - buy_amount <= 0:
+            print(f"❌ 잔고 부족으로 매수 중지 (현재 잔액: {current_balance:,}원, 주문 금액: {buy_amount:,}원)")
+            self.stop_auto_trade()
+            return
 
         stock_code, price, _ = self.scheduled_orders[self.order_index]
         buy_amount = int(self.ui.buy_amount_input.text())
@@ -104,6 +115,14 @@ class AutoTrader:
         if order_id == 0:
             print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
             self.pending_orders[stock_code] = order_id
+
+            # ✅ 주문 금액만큼 잔고 차감 (UI 즉시 반영)
+            self.ui.account_manager.current_balance -= buy_amount
+            print(f"💰 주문 후 예상 잔액: {self.ui.account_manager.current_balance:,}원")
+
+            # ✅ 실제 잔고 반영을 위해 다시 요청
+            self.ui.account_manager.request_account_balance()
+            QApplication.processEvents()
 
         self.order_index += 1  # ✅ 다음 주문 대기
 
@@ -115,6 +134,14 @@ class AutoTrader:
         if quantity < 1:
             print(f"❌ {stock_code}: 구매금액({amount})보다 주식의 가격({price})이 높습니다. 구매 실패 (수량: {quantity})")
             return None
+        
+        total_order_price = price * quantity
+
+        # ✅ 주문 가능 금액 확인
+        available_balance = self.ui.account_manager.current_balance
+        if available_balance is None or available_balance < total_order_price:
+            print(f"❌ 주문 불가: 현재 잔액 {available_balance:,}원, 주문 금액 {total_order_price:,}원")
+            return None
 
         print(f"📌 {stock_code} 매수 주문 실행 ({quantity}주, 시장가) 총 매수 금액 : {price * quantity:,} 원")
 
@@ -125,8 +152,14 @@ class AutoTrader:
 
         if order_id == 0:
             print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
+
+            # ✅ 주문 후 잔고 즉시 차감
+            self.ui.account_manager.current_balance -= total_order_price
+            print(f"💰 주문 후 예상 잔액: {self.ui.account_manager.current_balance:,}원")
+
             self.pending_orders[stock_code] = order_id
-            self.ui.account_manager.request_account_balance
+            
+            
         else:
             print(f"❌ {stock_code} 주문 실패 (반환값: {order_id})")
 
