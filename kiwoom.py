@@ -150,7 +150,7 @@ class AutoTrader:
             # ✅ 주문 후 잔고 즉시 차감
             self.ui.account_manager.current_balance -= total_order_price
             print(f"💰 주문 후 예상 잔액: {self.ui.account_manager.current_balance:,}원")
-            
+            self.ui.balance_label.setText(f"계좌 잔액: {self.ui.account_manager.current_balance:,}원")
             # ✅ 실제 잔고 반영을 위해 다시 요청
             # self.ui.account_manager.request_account_balance()
             QApplication.processEvents()
