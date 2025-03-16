@@ -66,13 +66,13 @@ class AutoTrader:
             if stock_code in self.pending_orders:  # 이미 주문한 종목은 제외
                 continue
 
-            current_price = self.kiwoom.dynamicCall("GetMasterLastPrice(QString)", stock_code).strip()
+            # ✅ 수정: 현재가를 opt10001에서 가져온 값으로 사용
+            current_price = stock.get("current_price", None)
             if not current_price:
-                continue
+                print(f"⚠️ 현재가 없음: {stock_code}, 현재가 갱신 필요")
+                continue  # 현재가 정보가 없는 경우 무시
 
-            current_price = int(current_price.replace(",", ""))
             ma20_price = stock["price"]
-
             price_diff = abs((current_price - ma20_price) / ma20_price)
 
             if price_diff <= threshold:
