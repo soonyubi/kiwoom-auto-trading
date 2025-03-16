@@ -116,13 +116,7 @@ class AutoTrader:
             print(f"📌 {stock_code} 매수 주문 완료. 주문 ID: {order_id}")
             self.pending_orders[stock_code] = order_id
 
-            # ✅ 주문 금액만큼 잔고 차감 (UI 즉시 반영)
-            self.ui.account_manager.current_balance -= buy_amount
-            print(f"💰 주문 후 예상 잔액: {self.ui.account_manager.current_balance:,}원")
-
-            # ✅ 실제 잔고 반영을 위해 다시 요청
-            self.ui.account_manager.request_account_balance()
-            QApplication.processEvents()
+            
 
         self.order_index += 1  # ✅ 다음 주문 대기
 
@@ -152,12 +146,16 @@ class AutoTrader:
 
         if order_id == 0:
             print(f"✅ {stock_code} 주문 접수 성공 (주문 ID: {order_id})")
-
+            self.pending_orders[stock_code] = order_id
             # ✅ 주문 후 잔고 즉시 차감
             self.ui.account_manager.current_balance -= total_order_price
             print(f"💰 주문 후 예상 잔액: {self.ui.account_manager.current_balance:,}원")
+            
+            # ✅ 실제 잔고 반영을 위해 다시 요청
+            # self.ui.account_manager.request_account_balance()
+            QApplication.processEvents()
 
-            self.pending_orders[stock_code] = order_id
+            
             
             
         else:
