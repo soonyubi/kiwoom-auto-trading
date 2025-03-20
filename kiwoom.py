@@ -382,6 +382,11 @@ class StockDataManager:
 
         self.ui.holdings_table.setRowCount(len(holdings))
 
+        if not holdings or holdings == {''}:
+            self.ui.holdings_table.setRowCount(0)
+            return
+
+
         for row, stock in enumerate(holdings):
             stock_code = stock["stock_code"]
             stock_name = stock["stock_name"]
